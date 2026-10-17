@@ -4,27 +4,44 @@ Re-implement, compare, rewire and fuse the forecasting models from
 `Resources/SET_Lab_Dl_Model_Selection.pdf` on the NWPGCL Sirajganj (SSP, 2025) and NIST ground-array (2017) data.
 PyTorch 2.14 (CUDA 13.0), Python 3.11.
 
-## 1. Setup
+## 1. Setup on a new machine (e.g. a colleague's PC)
 
-**Windows (this PC):**
+Needs: an NVIDIA GPU + driver, git, and either **Python 3.11** or **Docker**.
+
 ```powershell
-.\setup_venv.ps1            # creates .venv, installs torch cu130 + everything, runs the smoke test
-.\.venv\Scripts\Activate.ps1
+git clone <repo-url> powerForecasting_model
+cd powerForecasting_model
+# copy the Data/ folder (and Resources/, ref/ if wanted) into this directory
+powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1     # Linux: bash setup_venv.sh
 ```
-**Linux:** `bash setup_venv.sh`
+The setup script installs the exact package versions from `requirements/lock-*.txt` and picks the PyTorch CUDA
+build from the installed driver: cu130 for driver 580 or newer, cu126 for 528 or newer, otherwise CPU.
+It finishes with `pvf doctor`, which must print **READY**. It checks Python, GPU, packages, and that every data file
+is byte-identical to the checksums in `configs/data_manifest.json`.
 
-**Docker (colleague's PC, any OS with an NVIDIA GPU):** install Docker Desktop (Windows: WSL2 backend) or
-Docker + NVIDIA Container Toolkit (Linux), then
+**With Docker instead** (Docker Desktop with WSL2 on Windows, or Docker + NVIDIA Container Toolkit on Linux):
 ```bash
-docker compose build
-docker compose run --rm pvf python -m pvf smoke     # every model, forward+backward on GPU
-docker compose up lab                               # JupyterLab -> http://localhost:8888  (token: setlab)
+docker compose build                    # older driver (< 580): TORCH_CUDA=cu126 docker compose build
+docker compose run --rm pvf python -m pvf doctor
+docker compose run --rm pvf python -m pvf bench -x configs/experiments/round1.yaml site=ssp
+docker compose up lab                   # JupyterLab -> http://localhost:8888  (token: setlab)
 ```
-`Data/`, `runs/`, `results/`, `ref/`, `configs/` and `pvf/` are bind-mounted, so code edits need no rebuild.
-Only the NVIDIA driver is needed on the host; the CUDA runtime comes with the torch wheel.
 
-Pin exact versions for the team once a setup works: `pip freeze > requirements/lock-windows.txt` (or
-`lock-linux.txt` inside the container). The setup scripts and the Dockerfile use the lock file when it exists.
+### Running the same experiments on both machines
+
+| Who | Step |
+|---|---|
+| you | put the experiment in `configs/experiments/<name>.yaml` (or a model YAML), then `git commit` and `git push` |
+| colleague | `git pull`, then `python -m pvf bench -x configs/experiments/<name>.yaml site=ssp` |
+| either | `python -m pvf rerun runs/<site>/<model>/<timestamp>` repeats any run from its folder (send the folder; it is small) |
+
+Every run folder contains `config.yaml` (the full resolved config) and `provenance.json` (git commit, data
+checksums, GPU, versions). It also contains `git_diff.patch` if the code had uncommitted changes, so `rerun` tells
+you which commit to check out. With `deterministic=true`, a rerun on the same GPU type is bit-identical (verified).
+Different GPUs agree only to floating-point noise. If the data ever changes, run `python -m pvf data-manifest`
+and commit the result; `doctor` on the other machine will then flag stale copies.
+Foundation-model weights (Chronos-2, TimesFM, TiRex) download from Hugging Face on first use. To avoid that,
+copy `%USERPROFILE%\.cache\huggingface` over as well.
 
 ## 2. Data
 
@@ -101,6 +118,5 @@ The model contract lives in `pvf/models/base.py`: `forward(batch) -> {"pred": [B
 
 ## 6. Papers
 
-`ref/README.md` lists all 35 report references (R01–R35) with links, plus 21 foundational architecture papers
-(`ref/foundational/`). Re-run `python tools/fetch_refs.py` at any time. Paywalled ones (Elsevier/IEEE) must be
-fetched through the MIST library.
+`ref/` (transferred with the data, not in git) holds the selection-report papers R01–R35 and the foundational
+architecture papers. `ref/README.md` is the link list. `tools/fetch_refs.py` can rebuild the folder if needed.
