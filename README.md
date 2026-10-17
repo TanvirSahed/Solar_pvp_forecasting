@@ -1,121 +1,137 @@
-# pvf — PV AC-power forecasting research framework (SET Lab, MIST)
+# pvf: PV AC-power forecasting research framework (SET Lab, MIST)
 
-Re-implement, compare, rewire and fuse the forecasting models from
-`Resources/SET_Lab_Dl_Model_Selection.pdf` on the NWPGCL Sirajganj (SSP, 2025) and NIST ground-array (2017) data.
-PyTorch 2.14 (CUDA 13.0), Python 3.11.
+Build, change, fuse and compare deep forecasting models for PV AC power, using data from NWPGCL Sirajganj (SSP, 2025)
+and the NIST ground array (2017). The candidate models come from `Resources/SET_Lab_Dl_Model_Selection.pdf`.
+**Everything runs from one notebook: `notebooks/run_experiment.ipynb`.** There is no command line.
 
-## 1. Setup on a new machine (e.g. a colleague's PC)
+## How the pieces connect
 
-Needs: an NVIDIA GPU + driver, git, and either **Python 3.11** or **Docker**.
+```
+ data pipeline              input adapter               model architecture          training recipe
+ pvf/data/                  pvf/model_inputs/           pvf/models/                 pvf/training/
+ DataConfig ──► ForecastBatch ──► model input ──► forecast ◄── loss, optimizer, scheduler
+ (site, features,           (named steps:               (hyperparameters =          (TrainingRecipe)
+  lookback, split)           trace() / plot())           constructor arguments)
+                                                                   │
+                               pvf/experiment.py  run_experiment() ┘──► runs/<site>/<run>/<time>/  (model + results)
+                               pvf/evaluation/    metrics, compare_runs(), diagnostic plots
+```
+
+| Module | Holds | Change it to... |
+|---|---|---|
+| `pvf/data/features.py` | named features (`FEATURES`) | add a feature: write one function and list it |
+| `pvf/data/pipeline.py` | `DataConfig` -> `build_data_bundle()` -> train/validation/test datasets + `DataSpec` | choose site, features, lookback, horizon |
+| `pvf/data/splits.py` | `SplitConfig`: blocked (every season in every split) or by month, plus holdout | change the evaluation protocol |
+| `pvf/model_inputs/` | `InputAdapter` (a list of named steps) and the steps themselves | reshape the data for a new architecture |
+| `pvf/models/architectures/` | one family per file, every model registered by name | change hyperparameters, layers, connections |
+| `pvf/models/blocks/` | shared building blocks: Mamba, graph layers, heads, RevIN, KAN... | reuse parts across models |
+| `pvf/models/base.py` | `ForecastModel`, the contract between models and training | (rarely) |
+| `pvf/training/` | losses, optimizers, schedulers (by name), `TrainingRecipe`, trainer | add a loss, optimizer or scheduler |
+| `pvf/evaluation/` | standard metrics, conformal intervals, run comparison and plots | add a metric or diagnostic plot |
+| `pvf/experiment.py` | `run_experiment`, `load_trained_model`, `rerun_experiment` | (rarely) |
+| `pvf/workspace.py` | `check_environment`, `smoke_test_models`, `fetch_pretrained_weights` | (rarely) |
+
+### The model contract (`pvf/models/base.py`)
+Every model is called directly on a data batch, `model(forecast_batch)`. Inside, it runs
+`self.input_adapter` and then `self.forecast(model_input)`, which returns `{"forecast": ..., "auxiliary_loss"?: ...}`.
+Models are written as `encode()` (the reusable part) followed by a forecast head. The trainer touches nothing else,
+so any architecture that follows this contract trains, saves and is scored the same way.
+
+### Every experiment is saved
+`runs/<site>/<run_name>/<timestamp>/` contains:
+- `trained_model.pt`: the whole model, reloaded with `pvf.load_trained_model(run_dir)`;
+- `best_model.pt`: the best weights;
+- `config.yaml`: the full experiment, repeated exactly with `pvf.rerun_experiment(run_dir)`;
+- `metrics.json`: overall and per‑horizon scores for each split;
+- `predictions_<split>.npz`;
+- `provenance.json`: git commit, data checksums, GPU and package versions.
+
+Each run also adds one row to `results/experiment_log.csv`.
+
+### Standard scores (identical for every model)
+All scores are on daytime targets, as a percentage of rated power:
+- nMAE, nRMSE, bias, 95th‑percentile error, R²;
+- skill versus smart persistence (> 0 means the model beats the physics reference);
+- ramp error;
+- the same metrics per forecast step;
+- for quantile models, also CRPS, pinball loss and interval coverage (PICP) and width (PINAW).
+
+Definitions are in `pvf.evaluation.metrics.METRIC_DESCRIPTIONS`.
+
+## Naming rules
+PEP 8, so every kind of name is recognisable at a glance and matches PyTorch, numpy and pandas:
+
+| Kind | Case | Example |
+|---|---|---|
+| class | PascalCase | `GraphMamba`, `TrainingRecipe`, `BuildVariableNodes` |
+| function, method, variable, argument | snake_case | `build_data_bundle`, `history_features`, `lookback_steps` |
+| constant | UPPER_SNAKE | `FEATURES`, `MODEL_REGISTRY`, `CALENDAR_FEATURE_NAMES` |
+| registry name (model, loss, ...) | snake_case string | `"hdcf_mamba"`, `"reduce_on_plateau"` |
+
+Use full words, not `x`, `h` or `cfg`. Put units in the name (`ac_power_kw`, `irradiance_wm2`). Add tensor
+shapes as comments (`# [batch, lookback, n_features]`).
+
+## Adding things
+
+**A model:** add a class to a file in `pvf/models/architectures/`:
+
+```python
+@register_model("my_model")
+class MyModel(ForecastModel):
+    def __init__(self, data_spec, model_size=64, dropout=0.1, input_adapter=None):  # hyperparameters
+        super().__init__(data_spec, input_adapter)          # or pass an InputAdapter([...steps]) as the default
+        self.encoder = ...
+        self.forecast_head = ForecastHead(model_size, data_spec.horizon_steps, data_spec.n_future_features)
+    def encode(self, model_input):
+        return self.encoder(model_input["history_features"])           # [batch, model_size]
+    def forecast(self, model_input):
+        return {"forecast": self.shape_output(self.forecast_head(self.encode(model_input),
+                                                                 model_input["future_features"]))}
+```
+
+New files must be imported in `pvf/models/architectures/__init__.py`.
+
+**Fusing two models:** follow `pvf/models/architectures/fusion_example.py`, which fuses iTransformer's variable
+encoder with HDCF‑Mamba's temporal encoder through a learned gate. Its docstring gives the 4‑step recipe; copy it
+and swap in the two encoders you want.
+
+**A feature:** one `Feature(...)` entry in `pvf/data/features.py`. Mark `known_in_advance=True` only if its
+future values really are known at forecast time.
+
+**An input step:** subclass `AdapterStep` in `pvf/model_inputs/adapter_steps.py`. It adds named tensors to the
+input and keeps the rest. Steps adapt to the selected features and skip missing ones with a note.
+
+**A loss, optimizer or scheduler:** one line in `pvf/training/losses.py` or `pvf/training/optimizers.py`.
+
+## Setup on a new machine
+Needs an NVIDIA GPU and driver, git, and either Python 3.11 or Docker.
 
 ```powershell
-git clone <repo-url> powerForecasting_model
-cd powerForecasting_model
-# copy the Data/ folder (and Resources/, ref/ if wanted) into this directory
-powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1     # Linux: bash setup_venv.sh
-```
-The setup script installs the exact package versions from `requirements/lock-*.txt` and picks the PyTorch CUDA
-build from the installed driver: cu130 for driver 580 or newer, cu126 for 528 or newer, otherwise CPU.
-It finishes with `pvf doctor`, which must print **READY**. It checks Python, GPU, packages, and that every data file
-is byte-identical to the checksums in `configs/data_manifest.json`.
-
-**With Docker instead** (Docker Desktop with WSL2 on Windows, or Docker + NVIDIA Container Toolkit on Linux):
-```bash
-docker compose build                    # older driver (< 580): TORCH_CUDA=cu126 docker compose build
-docker compose run --rm pvf python -m pvf doctor
-docker compose run --rm pvf python -m pvf bench -x configs/experiments/round1.yaml site=ssp
-docker compose up lab                   # JupyterLab -> http://localhost:8888  (token: setlab)
+git clone <repo-url> powerForecasting_model; cd powerForecasting_model
+# copy Data/ (including Data/pretrained/), plus Resources/ and ref/ if wanted, into this folder
+powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1        # Linux: bash setup_venv.sh
 ```
 
-### Running the same experiments on both machines
+The script installs the exact package versions from `requirements/lock-*.txt`. It picks the PyTorch CUDA build
+from the driver: CUDA 13.0 for driver 580 or newer, CUDA 12.6 for older drivers, otherwise CPU. It then runs
+`pvf.check_environment()`, which must print READY. Open `notebooks/run_experiment.ipynb` with the `.venv` kernel.
 
-| Who | Step |
-|---|---|
-| you | put the experiment in `configs/experiments/<name>.yaml` (or a model YAML), then `git commit` and `git push` |
-| colleague | `git pull`, then `python -m pvf bench -x configs/experiments/<name>.yaml site=ssp` |
-| either | `python -m pvf rerun runs/<site>/<model>/<timestamp>` repeats any run from its folder (send the folder; it is small) |
+**Docker:** run `docker compose build` (with `TORCH_CUDA=cu126` in front if the driver is older than 580), then
+`docker compose up`. JupyterLab opens at http://localhost:8888 (token `setlab`). Code, data, runs and notebooks are
+mounted from the folder, so edits need no rebuild.
 
-Every run folder contains `config.yaml` (the full resolved config) and `provenance.json` (git commit, data
-checksums, GPU, versions). It also contains `git_diff.patch` if the code had uncommitted changes, so `rerun` tells
-you which commit to check out. With `deterministic=true`, a rerun on the same GPU type is bit-identical (verified).
-Different GPUs agree only to floating-point noise. If the data ever changes, run `python -m pvf data-manifest`
-and commit the result; `doctor` on the other machine will then flag stale copies.
-Foundation-model weights (Chronos-2, TimesFM, TiRex; about 1.5 GB) are stored as plain files in `Data/pretrained/`, so they travel with the Data folder and load fully offline. Clearing `~/.cache/huggingface` does not affect them. On a machine without them, `python -m pvf fetch-weights` (or the first run of such a model) downloads them once into that folder.
+**Same experiments on both PCs:** share a run folder and call `pvf.rerun_experiment(run_dir)`. It says which git
+commit the run used. The data checksums in `configs/data_manifest.json` make `check_environment()` flag
+mismatched data. After the data change, call `pvf.workspace.write_data_manifest()` and commit the result.
 
-## 2. Data
+## Data notes
+- NIST timestamps follow local time **with** daylight saving (America/New_York). The mean irradiance peak is at
+  about 12:05 in January and about 12:54 in June, so a fixed GMT−5 would shift clear sky by 1 h from March to November.
+- Each site has one inverter, while the selection report's graph model assumes four. For now `graph_mamba` uses
+  the variables as nodes. Write a `BuildInverterNodes` adapter step once per‑inverter data arrive.
+- There is no weather‑forecast (NWP) archive yet. The `*_oracle` future features are perfect‑forecast upper bounds,
+  not real forecasts.
+- Smart persistence is weak at long horizons from night origins (it predicts 0), which inflates skill scores at
+  day‑ahead horizons. Read skill together with nMAE and nRMSE.
 
-`pvf.data.loader.load_site(site)` builds the uniform record from `Data/features_*`, cached in `Data/cache/`:
-
-| | NIST (Gaithersburg, 260 kWac) | SSP (Sirajganj, 2.33 MW inverter block) |
-|---|---|---|
-| native | 1-min, P in W | P/T 5-min (kW), G 30-min |
-| used | P [kW], G [W/m²], T [°C] → 30-min interval mean | same |
-| timezone | **America/New_York (DST)** | GMT+6 |
-
-Added features: Ineichen clear-sky GHI `Gcs` (pvlib), calendar sin/cos, `P(t+h−24h)`, and smart persistence
-`s(t,h) = P(t)·Gcs(t+h)/Gcs(t)`. Inputs are normalised physically (P/P_rated, G/1000, (T−25)/25), so there is
-no fitted scaler to leak. Metrics on normalised P are therefore nMAE/nRMSE as a fraction of capacity.
-
-> NIST timestamps follow local clock time **with** daylight saving: the mean irradiance peak sits at ~12:05 in
-> January and ~12:54 in June. A fixed GMT−5 would shift clear-sky and smart persistence by 1 h from March to November.
-
-**Splits** (`configs/base.yaml → data.split`). The default is `blocked`: weekly blocks cycle
-train×4 / val / test, so every season is in every split. A sample's 48 targets lie inside one block, and training
-input windows never contain val/test timesteps (purge). Use `holdout_months: [12]` for a final untouched test,
-or `mode: months` for a pure chronological split.
-
-## 3. Models (`python -m pvf list`)
-
-| Report row | Registry name | Source |
-|---|---|---|
-| ref | `smart_persistence` | clear-sky persistence |
-| 1 | `lstm`, `gru`, `tcn`, `mlp`, `dlinear` | controls |
-| 2 | `patchtst` (+ ACI via `pvf.eval.conformal.aci`) | F01, R07 |
-| 3 | `itransformer` | F02 |
-| 4 | `timexer` | F03 |
-| 5 | `hdcf_mamba` | R06 §3 (MSFEM + single Mamba + temporal concat + 2-step linear decoder) |
-| 6 | `powermamba` | R19 §IV (RevIN, decomposition, Mamba ∥ iMamba, external-forecast appending) |
-| — | `mamba` (Concat-Mamba), `smamba` | F04, F06 |
-| 7–9 | `timesfm`, `chronos2`, `tirex` (zero-shot) | R14, R12, R13/F07 |
-| 10 | `rfkan` | R16 Eq. 3–8 |
-| 11–12 | `graph_mamba` (GCN/GAT, adjacency none/physics/learned/mixed α_t) | R21–R23, report §3 |
-| 13 | `dt_dann` (causal-CNN → Transformer, GRL domain classifier) | R18 |
-| 14 | `mtsa_qrn` (+ CQR via `pvf.eval.conformal.cqr`) | R08 §3 |
-| 15 | `pvf.ensemble.selector` (static-best, inverse-error, LinUCB; the RL agents plug in here) | R24–R26, R35 |
-| new | `fusion` (mean / gate / stack over any models, deep supervision) | — |
-
-The graph model's nodes are currently the physical variables {P, G, T, Gcs} with a physics prior, because each
-dataset holds a single inverter. Override `GraphMamba.build_nodes` when per-inverter data (Inv1…Inv4) arrive.
-
-## 4. Running experiments
-
-```bash
-python -m pvf data site=nist                                   # split summary
-python -m pvf train -m patchtst site=nist                      # one run
-python -m pvf train -m graph_mamba model.conv=gcn model.adj=learned tag=gcn   # any key overridable
-python -m pvf train -m hdcf_mamba model.anchor=sp              # learn the residual over smart persistence
-python -m pvf bench -x configs/experiments/round1.yaml site=ssp
-python -m pvf bench -x configs/experiments/graph_ablation.yaml site=ssp
-tensorboard --logdir runs
-python -m pytest -q                                            # leakage / split / conformal tests
-```
-Each run writes `runs/<site>/<model>[_tag]/<timestamp>/` containing `config.yaml`, `best.pt`, `metrics.json`
-(overall + per-horizon, skill vs smart persistence, ramp error, CRPS/PICP for quantile models) and
-`pred_<split>.npz`. Bench runs also append to `results/<site>_<experiment>.csv`.
-
-## 5. Changing architectures
-
-The model contract lives in `pvf/models/base.py`: `forward(batch) -> {"pred": [B,H] | [B,H,Q], "aux_loss"?: scalar, ...}`.
-`batch` = `x_hist [B,L,C_h]`, `x_fut [B,H,C_f]`, `y`, `mask`, `sp`, `t0`.
-
-* **New model:** a new file in `pvf/models/zoo/`, decorate it with `@register("name")`, add it to `zoo/__init__.py` and `configs/models/name.yaml`.
-* **Building blocks** (`pvf/models/layers/`): `MambaMixer`/`MambaLayer` (pure-PyTorch selective scan; `mamba_ssm` CUDA kernel used automatically on Linux if installed), `DenseGCN`, `DenseGAT`, `AdjacencyLearner`, `FourierKAN`, `RevIN`, `SeriesDecomp`, `PatchEmbed`, `HorizonHead`, `grad_reverse`.
-* **New connections:** any model can reuse another's encoder (for example `MambaTemporal.encode`); `HorizonHead(use_fut=True)` gives every backbone the same access to future clear-sky/NWP.
-* **Fusing models** from config only: see `configs/models/fusion_gate.yaml`.
-* **Physics anchoring:** `model.anchor=sp` wraps any model as `pred = smart_persistence + f(x)`.
-* **Extra losses / domain adaptation:** return `aux_loss`, or `deep_preds`, and set `data.adapt_months` to get `batch["tgt"]`.
-
-## 6. Papers
-
-`ref/` (transferred with the data, not in git) holds the selection-report papers R01–R35 and the foundational
-architecture papers. `ref/README.md` is the link list. `tools/fetch_refs.py` can rebuild the folder if needed.
+Paper links are in `ref/README.md`; the papers themselves travel with the data.

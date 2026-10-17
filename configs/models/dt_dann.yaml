@@ -1,2 +1,0 @@
-model: {name: dt_dann, d_model: 64, n_heads: 4, n_layers: 2, dann_weight: 0.1}
-data: {adapt_months: [10, 11, 12]}   # unlabelled target domain (e.g. a later season or the other site)

@@ -1,1 +1,0 @@
-model: {name: chronos2, checkpoint: amazon/chronos-2, use_covariates: true}

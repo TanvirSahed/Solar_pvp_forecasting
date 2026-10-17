@@ -14,7 +14,9 @@ services:
       - ./configs:/workspace/configs
       - ./pvf:/workspace/pvf            # live-edit code without rebuilding
       - ./notebooks:/workspace/notebooks
+      - ./tests:/workspace/tests
       - hf-cache:/workspace/.cache/huggingface
+    ports: ["8888:8888"]
     shm_size: 8gb
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
@@ -25,9 +27,5 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-  lab:
-    extends: pvf
-    ports: ["8888:8888"]
-    command: jupyter lab --ip=0.0.0.0 --no-browser --allow-root --ServerApp.token=setlab
 volumes:
   hf-cache:

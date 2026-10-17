@@ -1,1 +1,0 @@
-model: {name: graph_mamba, d_model: 64, temporal: mamba, t_layers: 2, conv: gat, g_layers: 2, heads: 4, adj: mixed, readout: target}

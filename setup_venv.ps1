@@ -1,7 +1,7 @@
 # One-command setup on Windows (run from the repo root in PowerShell):
 #     powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1
 # Creates .venv (Python 3.11), installs the exact package versions from requirements\lock-windows.txt,
-# picks the PyTorch CUDA build that matches the installed NVIDIA driver, then runs `pvf doctor`.
+# picks the PyTorch CUDA build that matches the installed NVIDIA driver, then checks the machine.
 #   -Cuda cu130|cu126|cpu   force a build instead of auto-detect
 param([string]$Cuda = "auto")
 $ErrorActionPreference = "Stop"
@@ -24,5 +24,5 @@ $py = ".\.venv\Scripts\python.exe"
 & $py -m pip install -r "requirements\torch-$Cuda.txt"
 & $py -m pip install -r requirements\lock-windows.txt
 & $py -m pip install --no-deps -e .
-& $py -m pvf doctor
-Write-Host "`nActivate with:  .\.venv\Scripts\Activate.ps1" -ForegroundColor Green
+& $py -c "import pvf; pvf.check_environment()"
+Write-Host "`nOpen notebooks\run_experiment.ipynb with the .venv kernel (VS Code: pick .venv as kernel, or run .\.venv\Scripts\jupyter lab)" -ForegroundColor Green

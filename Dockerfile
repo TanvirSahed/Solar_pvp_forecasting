@@ -1,8 +1,7 @@
 # GPU research image for pvf. Host needs only an NVIDIA driver (>= R580 for CUDA 13.0 wheels) and the
 # NVIDIA Container Toolkit (Linux) or Docker Desktop + WSL2 (Windows). CUDA runtime ships inside the torch wheel.
 #   docker compose build
-#   docker compose run --rm pvf python -m pvf smoke
-#   docker compose up lab        # JupyterLab on http://localhost:8888
+#   docker compose up            # JupyterLab on http://localhost:8888 (token: setlab) -> notebooks/run_experiment.ipynb
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -22,8 +21,8 @@ RUN pip install -r requirements/torch-${TORCH_CUDA}.txt \
 COPY pyproject.toml ./
 COPY pvf/ pvf/
 COPY configs/ configs/
-COPY tools/ tools/
 RUN pip install --no-deps -e .
 
 # Data, runs, results and refs are bind-mounted (see docker-compose.yml), not baked into the image.
-CMD ["python", "-m", "pvf", "list"]
+EXPOSE 8888
+CMD ["jupyter", "lab", "--ip=0.0.0.0", "--no-browser", "--allow-root", "--ServerApp.token=setlab", "--notebook-dir=/workspace"]

@@ -1,8 +1,8 @@
-"""Reproducibility: data checksums + per-run provenance, so a run made on one machine can be repeated on another.
+"""Reproducibility: data checksums and per-run provenance, so a run made on one machine can be repeated on another.
 
-configs/data_manifest.json  - sha256 of every input data file (committed; the data itself is transferred by hand)
-<run_dir>/provenance.json   - git commit, dirty flag, data hashes, torch/CUDA/GPU, package versions
-<run_dir>/git_diff.patch    - uncommitted code changes at run time (so even dirty runs can be reproduced)
+configs/data_manifest.json  sha256 of every input data file (committed; the data itself is copied by hand)
+<run_dir>/provenance.json   git commit, uncommitted-changes flag, data checksums, Python/torch/GPU, package versions
+<run_dir>/git_diff.patch    uncommitted code changes at run time
 """
 from __future__ import annotations
 
@@ -12,75 +12,77 @@ import platform
 import subprocess
 from pathlib import Path
 
-from .data.sites import ROOT, SITES
+from .data.sites import PROJECT_ROOT, SITES
 
-MANIFEST = ROOT / "configs" / "data_manifest.json"
+DATA_MANIFEST = PROJECT_ROOT / "configs" / "data_manifest.json"
 
 
 def data_files() -> list[Path]:
-    return sorted({p for s in SITES.values() for p, _, _ in s.files.values()})
+    return sorted({path for site in SITES.values() for path, _, _ in site.source_columns.values()})
 
 
-def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def data_hashes() -> dict:
-    return {p.relative_to(ROOT).as_posix(): (sha256(p) if p.exists() else None) for p in data_files()}
+def data_checksums() -> dict:
+    return {p.relative_to(PROJECT_ROOT).as_posix(): (file_sha256(p) if p.exists() else None) for p in data_files()}
 
 
-def write_manifest() -> dict:
-    h = data_hashes()
-    MANIFEST.write_text(json.dumps(h, indent=1) + "\n")
-    return h
+def write_data_manifest() -> dict:
+    """Record the current data checksums (run after the data change, then commit configs/data_manifest.json)."""
+    checksums = data_checksums()
+    DATA_MANIFEST.write_text(json.dumps(checksums, indent=1) + "\n")
+    return checksums
 
 
-def check_data() -> list[str]:
-    """Problems with local data vs the committed manifest ([] = identical)."""
-    if not MANIFEST.exists():
-        return ["configs/data_manifest.json missing (run: python -m pvf data-manifest)"]
-    want, have = json.loads(MANIFEST.read_text()), data_hashes()
-    probs = []
-    for f, h in want.items():
-        if have.get(f) is None:
-            probs.append(f"MISSING  {f}")
-        elif have[f] != h:
-            probs.append(f"DIFFERS  {f}")
-    return probs
+def check_data_against_manifest() -> list[str]:
+    """Problems with the local data compared with the committed manifest ([] = identical)."""
+    if not DATA_MANIFEST.exists():
+        return ["configs/data_manifest.json missing - run write_data_manifest()"]
+    expected, actual = json.loads(DATA_MANIFEST.read_text()), data_checksums()
+    problems = []
+    for file, checksum in expected.items():
+        if actual.get(file) is None:
+            problems.append(f"MISSING  {file}")
+        elif actual[file] != checksum:
+            problems.append(f"DIFFERS  {file}")
+    return problems
 
 
-def _git(*args) -> str:
+def git_output(*arguments) -> str:
     try:
-        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
-    except Exception:  # noqa: BLE001
+        return subprocess.run(["git", *arguments], cwd=PROJECT_ROOT, capture_output=True, text=True,
+                              check=True).stdout.strip()
+    except Exception:  # noqa: BLE001 - no git or not a repository: provenance just records nothing
         return ""
 
 
-def record(run_dir: Path) -> dict:
-    import importlib.metadata as md
+def record_provenance(run_dir: Path) -> dict:
+    import importlib.metadata as metadata
 
     import torch
 
-    commit, diff = _git("rev-parse", "HEAD"), _git("diff", "HEAD")
-    if diff:
-        (run_dir / "git_diff.patch").write_text(diff + "\n")
-    pkgs = {}
-    for p in ("torch", "numpy", "pandas", "pvlib", "chronos-forecasting", "timesfm", "tirex-ts", "mambapy"):
+    commit, uncommitted_diff = git_output("rev-parse", "HEAD"), git_output("diff", "HEAD")
+    if uncommitted_diff:
+        (run_dir / "git_diff.patch").write_text(uncommitted_diff + "\n")
+    package_versions = {}
+    for package in ("torch", "numpy", "pandas", "pvlib", "chronos-forecasting", "timesfm", "tirex-ts", "mambapy"):
         try:
-            pkgs[p] = md.version(p)
-        except md.PackageNotFoundError:
+            package_versions[package] = metadata.version(package)
+        except metadata.PackageNotFoundError:
             pass
-    prov = {
-        "git_commit": commit, "git_dirty": bool(diff),
-        "data_sha256": data_hashes(), "data_matches_manifest": not check_data(),
-        "python": platform.python_version(), "os": platform.platform(),
+    provenance = {
+        "git_commit": commit, "has_uncommitted_changes": bool(uncommitted_diff),
+        "data_checksums": data_checksums(), "data_matches_manifest": not check_data_against_manifest(),
+        "python": platform.python_version(), "operating_system": platform.platform(),
         "torch_cuda": torch.version.cuda,
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
-        "packages": pkgs,
+        "packages": package_versions,
     }
-    (run_dir / "provenance.json").write_text(json.dumps(prov, indent=1))
-    return prov
+    (run_dir / "provenance.json").write_text(json.dumps(provenance, indent=1))
+    return provenance

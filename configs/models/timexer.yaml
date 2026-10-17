@@ -1,1 +1,0 @@
-model: {name: timexer, patch_len: 16, d_model: 128, n_heads: 8, n_layers: 2, d_ff: 256, dropout: 0.1}

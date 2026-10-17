@@ -18,5 +18,5 @@ $PY -m pip install --upgrade pip
 $PY -m pip install -r "requirements/torch-$CUDA.txt"
 $PY -m pip install -r requirements/lock-linux.txt
 $PY -m pip install --no-deps -e .
-$PY -m pvf doctor
-echo "Activate with:  source .venv/bin/activate"
+$PY -c "import pvf; pvf.check_environment()"
+echo "Open notebooks/run_experiment.ipynb (e.g. .venv/bin/jupyter lab)"

@@ -1,1 +1,0 @@
-model: {name: timesfm, checkpoint: google/timesfm-2.5-200m-pytorch}

@@ -1,1 +1,0 @@
-model: {name: itransformer, d_model: 128, n_heads: 8, n_layers: 3, d_ff: 256, dropout: 0.1}

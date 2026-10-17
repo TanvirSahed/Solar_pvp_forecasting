@@ -1,8 +1,8 @@
 .venv/
 __pycache__/
 *.pyc
-runs/
-results/
+/runs/
+/results/
 
 
 .ipynb_checkpoints/
@@ -13,6 +13,7 @@ results/
 ref/**/*.pdf
 
 # Plant data (NWPGCL) and unpublished manuscript: share outside git
-Data/
-Resources/
-Paper/
+/Data/
+/Resources/
+/Paper/
+.pytest_cache/
