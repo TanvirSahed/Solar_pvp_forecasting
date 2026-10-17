@@ -19,3 +19,4 @@ pytest>=8
 ipykernel>=6.29
 jupyterlab>=4.2
 mambapy
+reportlab>=4.0           # tools/markdown_to_pdf.py (report PDFs)

@@ -26,9 +26,10 @@ and the NIST ground array (2017). The candidate models come from `Resources/SET_
 | `pvf/models/architectures/` | one family per file, every model registered by name | change hyperparameters, layers, connections |
 | `pvf/models/blocks/` | shared building blocks: Mamba, graph layers, heads, RevIN, KAN... | reuse parts across models |
 | `pvf/models/base.py` | `ForecastModel`, the contract between models and training | (rarely) |
-| `pvf/training/` | losses, optimizers, schedulers (by name), `TrainingRecipe`, trainer | add a loss, optimizer or scheduler |
+| `pvf/training/` | losses, optimizers, schedulers (by name), `TrainingRecipe`, trainer, `paper_recipes.py` | add a loss, optimizer or scheduler; change a paper preset |
 | `pvf/evaluation/` | standard metrics, conformal intervals, run comparison and plots | add a metric or diagnostic plot |
-| `pvf/experiment.py` | `run_experiment`, `load_trained_model`, `rerun_experiment` | (rarely) |
+| `pvf/experiment.py` | `run_experiment`, `load_trained_model` | (rarely) |
+| `pvf/search.py` | `search_hyperparameters` (small grid / random search, ranked on validation) | (rarely) |
 | `pvf/workspace.py` | `check_environment`, `smoke_test_models`, `fetch_pretrained_weights` | (rarely) |
 
 ### The model contract (`pvf/models/base.py`)
@@ -41,12 +42,22 @@ so any architecture that follows this contract trains, saves and is scored the s
 `runs/<site>/<run_name>/<timestamp>/` contains:
 - `trained_model.pt`: the whole model, reloaded with `pvf.load_trained_model(run_dir)`;
 - `best_model.pt`: the best weights;
-- `config.yaml`: the full experiment, repeated exactly with `pvf.rerun_experiment(run_dir)`;
-- `metrics.json`: overall and per‑horizon scores for each split;
-- `predictions_<split>.npz`;
-- `provenance.json`: git commit, data checksums, GPU and package versions.
+- `config.yaml`: the data config, model, hyperparameters and training recipe the run used;
+- `metrics.json`: training history (with validation nMAE/nRMSE per epoch) and overall and per‑horizon scores per split;
+- `predictions_<split>.npz`.
 
 Each run also adds one row to `results/experiment_log.csv`.
+
+### Training controls (`pvf.TrainingRecipe`)
+Loss (+ options), optimizer (+ options), learning rate, weight decay, scheduler (+ options), warm‑up epochs, epochs,
+early‑stopping metric (validation loss, nMAE or nRMSE) and patience (`None` = fixed epochs), batch size, gradient
+accumulation, gradient clipping, mixed precision, training‑data fraction, initialising from another run, and
+freezing parameter groups.
+
+**Paper recipes:** `pvf.paper_recipe("<model>")` loads the hyperparameters, training recipe and lookback each
+reference paper used. Values a paper leaves out are filled in and listed in `.notes`. The full write‑up is in
+`docs/training_recipes.md`, with a PDF copy in `Resources/Training_Recipes_Reference_Papers.pdf`; regenerate it
+with `python tools/markdown_to_pdf.py docs/training_recipes.md Resources/Training_Recipes_Reference_Papers.pdf`.
 
 ### Standard scores (identical for every model)
 All scores are on daytime targets, as a percentage of rated power:
@@ -114,15 +125,14 @@ powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1        # Linux: bash s
 
 The script installs the exact package versions from `requirements/lock-*.txt`. It picks the PyTorch CUDA build
 from the driver: CUDA 13.0 for driver 580 or newer, CUDA 12.6 for older drivers, otherwise CPU. It then runs
-`pvf.check_environment()`, which must print READY. Open `notebooks/run_experiment.ipynb` with the `.venv` kernel.
+`pvf.check_environment()`, which must print READY (GPU, packages, data files present). Open `notebooks/run_experiment.ipynb` with the `.venv` kernel.
 
 **Docker:** run `docker compose build` (with `TORCH_CUDA=cu126` in front if the driver is older than 580), then
 `docker compose up`. JupyterLab opens at http://localhost:8888 (token `setlab`). Code, data, runs and notebooks are
 mounted from the folder, so edits need no rebuild.
 
-**Same experiments on both PCs:** share a run folder and call `pvf.rerun_experiment(run_dir)`. It says which git
-commit the run used. The data checksums in `configs/data_manifest.json` make `check_environment()` flag
-mismatched data. After the data change, call `pvf.workspace.write_data_manifest()` and commit the result.
+**Sharing experiments:** commit code changes and push; your colleague pulls and runs the notebook. A run folder can
+be copied over and loaded with `pvf.load_trained_model(run_dir)`.
 
 ## Data notes
 - NIST timestamps follow local time **with** daylight saving (America/New_York). The mean irradiance peak is at

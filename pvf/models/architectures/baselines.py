@@ -55,18 +55,29 @@ class DeepMLP(ForecastModel):
 class _RecurrentForecaster(ForecastModel):
     recurrent_layer_class = nn.LSTM
 
-    def __init__(self, data_spec, hidden_size=64, n_layers=2, dropout=0.1, use_future_features=True,
-                 quantile_levels=None, input_adapter=None):
+    def __init__(self, data_spec, hidden_size=64, n_layers=2, dropout=0.1, bidirectional=False, pooling="last",
+                 use_future_features=True, quantile_levels=None, input_adapter=None):
+        """bidirectional: also read the lookback window backwards (never the horizon) - R20.
+        pooling: "last" hidden state, or "attention" = learned softmax-weighted average over time (R20)."""
         super().__init__(data_spec, input_adapter, quantile_levels)
         self.recurrent_encoder = self.recurrent_layer_class(data_spec.n_history_features, hidden_size, n_layers,
-                                                            batch_first=True, dropout=dropout)
-        self.forecast_head = ForecastHead(hidden_size, data_spec.horizon_steps, data_spec.n_future_features,
+                                                            batch_first=True, dropout=dropout,
+                                                            bidirectional=bidirectional)
+        state_size = hidden_size * (2 if bidirectional else 1)
+        if pooling not in ("last", "attention"):
+            raise ValueError("pooling must be 'last' or 'attention'")
+        self.pooling = pooling
+        self.attention_scorer = nn.Linear(state_size, 1) if pooling == "attention" else None
+        self.forecast_head = ForecastHead(state_size, data_spec.horizon_steps, data_spec.n_future_features,
                                           use_future_features, n_outputs_per_step=self.n_outputs_per_step,
                                           dropout=dropout)
 
     def encode(self, model_input):
-        hidden_states, _ = self.recurrent_encoder(model_input["history_features"])
-        return hidden_states[:, -1]                                         # [batch, hidden_size]
+        hidden_states, _ = self.recurrent_encoder(model_input["history_features"])   # [batch, time, state_size]
+        if self.pooling == "last":
+            return hidden_states[:, -1]
+        weights = torch.softmax(self.attention_scorer(hidden_states), dim=1)            # [batch, time, 1]
+        return (weights * hidden_states).sum(1)
 
     def forecast(self, model_input):
         representation = self.encode(model_input)

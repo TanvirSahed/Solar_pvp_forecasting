@@ -1,9 +1,8 @@
 """Machine-level helpers called from the notebook (there is no command line).
 
-    check_environment()          is this machine ready? (Python, GPU, packages, data identical to the manifest)
+    check_environment()          is this machine ready? (Python, GPU, packages, data files present)
     smoke_test_models()          every model: build + forward + backward on a real batch
     fetch_pretrained_weights()   foundation-model weights -> Data/pretrained (offline afterwards)
-    write_data_manifest()        (owner, after the data change) record data checksums, then commit the file
 """
 from __future__ import annotations
 
@@ -12,7 +11,7 @@ import time
 
 import pandas as pd
 
-from .provenance import check_data_against_manifest, data_files, write_data_manifest  # noqa: F401
+from .data.sites import SITES
 
 
 def check_environment() -> bool:
@@ -40,11 +39,12 @@ def check_environment() -> bool:
         except metadata.PackageNotFoundError:
             check(not required, f"{package} not installed" + ("" if required else " (optional)"))
     print("data (copy the Data/ folder into the project root)")
-    problems = check_data_against_manifest()
-    for problem in problems:
-        check(False, problem)
-    if not problems:
-        check(True, f"{len(data_files())} data files identical to configs/data_manifest.json")
+    data_files = sorted({path for site in SITES.values() for path, _, _ in site.source_columns.values()})
+    missing = [path for path in data_files if not path.exists()]
+    for path in missing:
+        check(False, f"missing {path}")
+    if not missing:
+        check(True, f"{len(data_files)} data files present")
     from .models.architectures.foundation_models import PRETRAINED_WEIGHTS_DIR, WEIGHTS_REPOSITORIES
 
     present = [n for n, r in WEIGHTS_REPOSITORIES.items()

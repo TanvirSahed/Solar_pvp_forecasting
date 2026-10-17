@@ -1,6 +1,0 @@
-{
- "Data/features_nist_ground_2017/ac_power.parquet": "44622715b0cb61d242c00ff24a040b8b72612ea8c64df35d3e5fcbe63f6d2164",
- "Data/features_nist_ground_2017/ground_radiation_wm2.parquet": "1cb72fe42cbc712041bc20182e540655987345cc11ce7b333fbd8f7617548ac3",
- "Data/features_nist_ground_2017/pv_module_temperature.parquet": "505ad8d04d14a024dbe6b4f7a0f76929cae3a4957f8efc8dfff7557e44d626a3",
- "Data/features_ssp_2025/dataset.parquet": "9168d535e688a4f13b7d1d5007429cca2e0be73c5a7ec56d4b3ba3e638d108f8"
-}

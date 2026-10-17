@@ -6,8 +6,7 @@
     result.summary()                         # standard metrics per split
 
 Run folder runs/<site>/<run_name>/<timestamp>/:
-    config.yaml                the full ExperimentConfig -> rerun_experiment(run_dir) repeats it
-    provenance.json            git commit, data checksums, GPU, package versions (+ git_diff.patch if dirty)
+    config.yaml                the full ExperimentConfig (what data, model and recipe the run used)
     best_model.pt              best weights (lowest validation loss)
     trained_model.pt           the whole trained model object -> load_trained_model(run_dir)
     metrics.json               training history + metrics per split (overall and per horizon step)
@@ -31,7 +30,6 @@ from .data.sites import PROJECT_ROOT, get_site
 from .data.splits import SplitConfig
 from .evaluation.metrics import evaluate_predictions, per_horizon_metrics
 from .models.base import build_model, count_trainable_parameters
-from .provenance import record_provenance
 from .training.trainer import TrainingRecipe, predict, train_model
 
 RUNS_DIR = PROJECT_ROOT / "runs"
@@ -49,7 +47,7 @@ class ExperimentConfig:
     evaluation_splits: list = field(default_factory=lambda: ["validation", "test", "holdout"])
 
     def to_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        return json.loads(json.dumps(dataclasses.asdict(self)))   # tuples -> lists so YAML can store them
 
     @classmethod
     def from_dict(cls, values: dict) -> "ExperimentConfig":
@@ -80,20 +78,17 @@ class ExperimentResult:
 def run_experiment(config: ExperimentConfig, data_bundle: DataBundle | None = None, model=None,
                    runs_dir: Path = RUNS_DIR, log=print) -> ExperimentResult:
     """Pass `data_bundle` to reuse already-built data; pass `model` to train a model object you built yourself
-    (e.g. a new fusion in the notebook) - then config.model_name is only a label and `rerun` cannot rebuild it."""
+    (e.g. a new fusion in the notebook) - then config.model_name is only a label."""
     data_bundle = data_bundle or build_data_bundle(config.data)
     if model is None:
         model = build_model(config.model_name, data_bundle.spec, config.residual_on_smart_persistence,
                             **config.model_hyperparameters)
     else:
-        log("using the model object passed in; config.yaml records model_name + model_hyperparameters for reruns")
+        log("using the model object passed in")
     run_name = config.run_name or config.model_name
     run_dir = Path(runs_dir) / config.data.site / run_name / time.strftime("%Y%m%d-%H%M%S")
     run_dir.mkdir(parents=True, exist_ok=True)
     config.save(run_dir / "config.yaml")
-    provenance = record_provenance(run_dir)
-    if not provenance["data_matches_manifest"]:
-        log("WARNING: data differ from configs/data_manifest.json -> not comparable with other machines")
     n_parameters = count_trainable_parameters(model)
     log(f"{run_name}: {type(model).__name__}, {n_parameters:,} trainable parameters -> {run_dir}")
 
@@ -124,7 +119,12 @@ def run_experiment(config: ExperimentConfig, data_bundle: DataBundle | None = No
             + (f"  CRPS {overall['crps']:.4f}" if "crps" in overall else ""))
     (run_dir / "metrics.json").write_text(json.dumps(metrics, indent=1))
     if model.is_trainable:   # whole model object too: reloads even models built by hand in the notebook
-        torch.save(model.cpu(), run_dir / "trained_model.pt")
+        try:
+            torch.save(model.cpu(), run_dir / "trained_model.pt")
+        except Exception as error:  # noqa: BLE001 - e.g. weight-norm layers cannot be pickled; weights are saved
+            (run_dir / "trained_model.pt").unlink(missing_ok=True)
+            log(f"note: whole-model file skipped ({type(error).__name__}); load_trained_model rebuilds it from "
+                f"config.yaml + best_model.pt")
     _append_to_experiment_log(metrics, run_dir)
     log(f"saved: {run_dir}")
     return ExperimentResult(run_dir, metrics, model, data_bundle)
@@ -157,19 +157,3 @@ def load_trained_model(run_dir, data_bundle: DataBundle | None = None):
         model.load_state_dict(torch.load(run_dir / "best_model.pt", map_location="cpu"))
     return model
 
-
-def rerun_experiment(run_dir, log=print) -> ExperimentResult:
-    """Repeat a run exactly from its folder (on this or another machine). Warns when the code version differs."""
-    from .provenance import git_output
-
-    run_dir = Path(run_dir)
-    provenance_file = run_dir / "provenance.json"
-    if provenance_file.exists():
-        provenance = json.loads(provenance_file.read_text())
-        current_commit = git_output("rev-parse", "HEAD")
-        if provenance.get("git_commit") and current_commit and provenance["git_commit"] != current_commit:
-            log(f"note: run was made at commit {provenance['git_commit'][:8]}, code is now at {current_commit[:8]} "
-                f"(exact code: git checkout {provenance['git_commit'][:8]})")
-        if provenance.get("has_uncommitted_changes"):
-            log(f"note: the run had uncommitted changes -> git apply {run_dir / 'git_diff.patch'}")
-    return run_experiment(ExperimentConfig.load(run_dir / "config.yaml"), log=log)

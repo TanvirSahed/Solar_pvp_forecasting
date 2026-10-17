@@ -40,16 +40,38 @@ def selective_scan_sequential(x, delta, A, B, C, D):
     return torch.stack(outputs, 1) + x * D
 
 
-def selective_scan_parallel(x, delta, A, B, C, D):
+def _scan_chunk(x, delta, A, B, C, initial_state):
+    """Parallel scan of one time chunk that starts from `initial_state` [batch, channels, state]."""
     time = x.shape[1]
     padded_time = 1 << (time - 1).bit_length()                              # mambapy wants a power of two
-    decay = torch.exp(delta.unsqueeze(-1) * A)
+    decay = torch.exp(delta.unsqueeze(-1) * A)                              # [batch, time, channels, state]
     state_input = delta.unsqueeze(-1) * B.unsqueeze(2) * x.unsqueeze(-1)
     if padded_time != time:  # pad at the END with identity steps: earlier states are unaffected
-        decay = F.pad(decay, (0, 0, 0, 0, 0, padded_time - time), value=1.0)
+        decay_padded = F.pad(decay, (0, 0, 0, 0, 0, padded_time - time), value=1.0)
         state_input = F.pad(state_input, (0, 0, 0, 0, 0, padded_time - time))
-    states = _parallel_scan(decay, state_input)[:, :time]
-    return (states * C.unsqueeze(2)).sum(-1) + x * D
+    else:
+        decay_padded = decay
+    states = _parallel_scan(decay_padded, state_input)[:, :time]            # as if the chunk started from 0
+    states = states + torch.cumprod(decay, dim=1) * initial_state.unsqueeze(1)   # carry the previous chunk in
+    return (states * C.unsqueeze(2)).sum(-1), states[:, -1]
+
+
+def selective_scan_parallel(x, delta, A, B, C, D, chunk_steps: int = 64):
+    """Chunked parallel scan with gradient checkpointing: memory grows with chunk_steps, not sequence length
+    (a 192-step graph model drops from ~14 GB to a few GB)."""
+    from torch.utils.checkpoint import checkpoint
+
+    state = x.new_zeros(x.shape[0], x.shape[2], A.shape[1])
+    outputs = []
+    for start in range(0, x.shape[1], chunk_steps):
+        piece = slice(start, start + chunk_steps)
+        arguments = (x[:, piece], delta[:, piece], A, B[:, piece], C[:, piece], state)
+        if torch.is_grad_enabled():
+            y, state = checkpoint(_scan_chunk, *arguments, use_reentrant=False)
+        else:
+            y, state = _scan_chunk(*arguments)
+        outputs.append(y)
+    return torch.cat(outputs, 1) + x * D
 
 
 def _choose_backend(scan_backend: str) -> str:
