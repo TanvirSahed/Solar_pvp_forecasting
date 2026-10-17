@@ -1,0 +1,2 @@
+Vendored from https://github.com/DietrichGebert/ponytail @ 16352ac (MIT, see PONYTAIL-LICENSE).
+Skills only: no hooks, no Node, nothing leaves the machine. Update by re-copying skills/* from the repo.
