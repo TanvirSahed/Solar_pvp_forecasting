@@ -11,12 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends git curl build-
 
 WORKDIR /workspace
 COPY requirements/ requirements/
-# requirements/lock-linux.txt is generated inside the container on first build (see README) - if present,
-# it pins every package to the exact versions the team validated.
 ARG TORCH_CUDA=cu130
 RUN pip install -r requirements/torch-${TORCH_CUDA}.txt \
- && if [ -f requirements/lock-linux.txt ]; then pip install -r requirements/lock-linux.txt; \
-    else pip install -r requirements/core.txt -r requirements/fm.txt; fi
+ && pip install -r requirements/lock-linux.txt
 
 COPY pyproject.toml ./
 COPY pvf/ pvf/

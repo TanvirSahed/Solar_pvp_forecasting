@@ -62,8 +62,28 @@ def test_adaptive_conformal_intervals_do_not_look_ahead():
 
 
 def test_experiment_config_round_trip(tmp_path):
-    config = ExperimentConfig(model_name="tcn", model_hyperparameters={"channels": 16},
+    config = ExperimentConfig(model_name="lstm", model_hyperparameters={"hidden_size": 16},
                               data=pvf.DataConfig(site="nist", split=pvf.SplitConfig(holdout_months=[12])),
                               recipe=pvf.TrainingRecipe(scheduler="cosine"))
     config.save(tmp_path / "config.yaml")
     assert ExperimentConfig.load(tmp_path / "config.yaml") == config
+
+
+def test_every_model_trains_one_step(data_bundle):
+    """Every registered model builds, runs forward and backward on a real batch (zero-shot ones forward only)."""
+    import torch
+
+    from pvf.models import architectures  # noqa: F401
+    from pvf.models.base import MODEL_REGISTRY
+    from pvf.training.trainer import loss_function_for, move_to_device, pick_device
+
+    device = pick_device()
+    batch = move_to_device(pvf.sample_batch(data_bundle, batch_size=8), device)
+    for name, model_class in sorted(MODEL_REGISTRY.items()):
+        if getattr(model_class, "needs_weight_download", False):
+            continue
+        model = pvf.build_model(name, data_bundle.spec).to(device).train()
+        loss = loss_function_for(model, pvf.TrainingRecipe())(model(batch)["forecast"], batch)
+        assert torch.isfinite(loss), name
+        if loss.requires_grad:
+            loss.backward()

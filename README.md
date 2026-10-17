@@ -30,7 +30,7 @@ and the NIST ground array (2017). The candidate models come from `Resources/SET_
 | `pvf/evaluation/` | standard metrics, conformal intervals, run comparison and plots | add a metric or diagnostic plot |
 | `pvf/experiment.py` | `run_experiment`, `load_trained_model` | (rarely) |
 | `pvf/search.py` | `search_hyperparameters` (small grid / random search, ranked on validation) | (rarely) |
-| `pvf/workspace.py` | `check_environment`, `smoke_test_models`, `fetch_pretrained_weights` | (rarely) |
+| `pvf/workspace.py` | `check_environment` | (rarely) |
 
 ### The model contract (`pvf/models/base.py`)
 Every model is called directly on a data batch, `model(forecast_batch)`. Inside, it runs
@@ -100,7 +100,7 @@ class MyModel(ForecastModel):
                                                                  model_input["future_features"]))}
 ```
 
-New files must be imported in `pvf/models/architectures/__init__.py`.
+New files must be imported in `pvf/models/architectures/__init__.py`. `python -m pytest -q tests` then checks that every model trains one step.
 
 **Fusing two models:** follow `pvf/models/architectures/fusion_example.py`, which fuses iTransformer's variable
 encoder with HDCF‑Mamba's temporal encoder through a learned gate. Its docstring gives the 4‑step recipe; copy it

@@ -83,7 +83,7 @@ class ReversibleInstanceNorm(nn.Module):
 
 
 class SeriesDecomposition(nn.Module):
-    """Moving-average trend + seasonal remainder (Autoformer, DLinear, PowerMamba). x: [batch, time, channels]."""
+    """Moving-average trend + seasonal remainder (PowerMamba). x: [batch, time, channels]."""
 
     def __init__(self, kernel_size: int = 25):
         super().__init__()

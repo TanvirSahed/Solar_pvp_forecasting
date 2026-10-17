@@ -5,7 +5,7 @@ timesfm   TimesFM 2.5 (R14), univariate on ac_power.
 tirex     TiRex (F07; TiRex-2 R13 when released), univariate on ac_power.
 
 Weights are plain files in Data/pretrained/<org>--<name>/ (they travel with the Data folder and load offline).
-If missing they are downloaded there once; pvf.fetch_pretrained_weights() does all of them up front.
+If missing they are downloaded there once, on first use.
 These models like long context: try DataConfig(lookback_steps=512).
 """
 from __future__ import annotations

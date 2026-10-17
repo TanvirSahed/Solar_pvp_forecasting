@@ -11,6 +11,6 @@ from .training.optimizers import OPTIMIZERS, SCHEDULERS  # noqa: F401
 from .search import search_hyperparameters  # noqa: F401
 from .training.paper_recipes import describe_paper_recipes, paper_recipe  # noqa: F401
 from .training.trainer import TrainingRecipe  # noqa: F401
-from .workspace import check_environment, fetch_pretrained_weights, smoke_test_models  # noqa: F401
+from .workspace import check_environment  # noqa: F401
 
 __version__ = "0.2.0"
