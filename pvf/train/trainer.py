@@ -20,13 +20,21 @@ from ..data.datamodule import build_data, make_loader, summarize
 from ..data.sites import ROOT, get_site
 from ..eval.metrics import per_horizon, point_metrics, prob_metrics
 from ..models.base import build_model, count_params
+from ..provenance import record
 
 
-def seed_all(s: int):
+def seed_all(s: int, deterministic: bool = False):
     random.seed(s)
     np.random.seed(s)
     torch.manual_seed(s)
     torch.cuda.manual_seed_all(s)
+    if deterministic:  # bit-identical reruns on the same GPU/driver (slower); different GPUs still differ slightly
+        import os
+
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.use_deterministic_algorithms(True, warn_only=True)
 
 
 def masked_loss(pred, y, mask, kind="mse", quantiles=None):
@@ -79,7 +87,7 @@ def evaluate(res: dict, model, site) -> dict:
 
 def run(cfg) -> Path:
     t_start = time.time()
-    seed_all(cfg.seed)
+    seed_all(cfg.seed, cfg.get("deterministic", False))
     dev = torch.device("cuda" if torch.cuda.is_available() and cfg.device != "cpu" else "cpu")
     amp = {"bf16": torch.bfloat16, "fp16": torch.float16}.get(cfg.train.amp) if dev.type == "cuda" else None
     data = build_data(cfg)
@@ -91,6 +99,11 @@ def run(cfg) -> Path:
     out = ROOT / cfg.out_dir / cfg.site / name / time.strftime("%Y%m%d-%H%M%S")
     out.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(cfg, out / "config.yaml")
+    prov = record(out)
+    if prov["git_dirty"]:
+        print("note: uncommitted code changes saved to git_diff.patch")
+    if not prov["data_matches_manifest"]:
+        print("WARNING: data differs from configs/data_manifest.json -> results not comparable (python -m pvf doctor)")
     n_par = count_params(model)
     print(f"model={cfg.model.name} params={n_par:,} device={dev} amp={cfg.train.amp} -> {out}")
 

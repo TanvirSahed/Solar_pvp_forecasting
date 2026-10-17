@@ -6,6 +6,9 @@
   python -m pvf train  -m patchtst site=nist model.d_model=64 train.epochs=50
   python -m pvf train  -m graph_mamba -c my_overrides.yaml tag=try1
   python -m pvf bench  -x configs/experiments/round1.yaml site=ssp       # many runs -> results/<site>_<exp>.csv
+  python -m pvf doctor                                 # is this machine (GPU, packages, data) ready?
+  python -m pvf rerun  runs/ssp/patchtst/20261018-101500                # repeat a run from its saved config
+  python -m pvf data-manifest                          # (owner) record data checksums after the data changes
 
 Config precedence: configs/base.yaml < configs/models/<model>.yaml < -c file(s) < experiment run entry < key=value
 """
@@ -93,6 +96,82 @@ def cmd_train(a):
     print("run dir:", run(compose(a.model, a.config, a.overrides)))
 
 
+def cmd_doctor(a):
+    """Is this machine ready to reproduce our experiments? Exit code 0 = yes."""
+    import importlib.metadata as md
+
+    import torch
+
+    from .provenance import check_data, data_files
+
+    ok = True
+
+    def line(good, msg):
+        nonlocal ok
+        ok &= bool(good)
+        print(("  OK   " if good else "  FAIL ") + msg)
+
+    print("environment")
+    line(sys.version_info[:2] == (3, 11), f"python {sys.version.split()[0]} (expected 3.11)")
+    line(True, f"torch {torch.__version__}  cuda-runtime {torch.version.cuda}")
+    cuda = torch.cuda.is_available()
+    line(cuda, f"GPU: {torch.cuda.get_device_name(0) if cuda else 'none -> CPU only (slow); check NVIDIA driver'}")
+    if cuda:
+        line(torch.cuda.is_bf16_supported(), "bf16 supported (else set train.amp=fp16)")
+    for p in ("mambapy", "pvlib", "omegaconf", "chronos-forecasting", "timesfm", "tirex-ts"):
+        try:
+            line(True, f"{p} {md.version(p)}")
+        except md.PackageNotFoundError:
+            line(p not in ("mambapy", "pvlib", "omegaconf"), f"{p} not installed" + (" (optional)" if p in ("chronos-forecasting", "timesfm", "tirex-ts") else ""))
+    print("data (copy the Data/ folder into the repo root)")
+    probs = check_data()
+    for p in probs:
+        line(False, p)
+    if not probs:
+        line(True, f"{len(data_files())} files identical to configs/data_manifest.json")
+    print("model zoo")
+    try:
+        from .models import zoo  # noqa: F401
+        from .models.base import MODELS
+
+        line(True, f"{len(MODELS)} models registered")
+    except Exception as e:  # noqa: BLE001
+        line(False, f"model import failed: {e}")
+    print("\nREADY" if ok else "\nNOT READY - fix the FAIL lines above")
+    sys.exit(0 if ok else 1)
+
+
+def cmd_rerun(a):
+    """Repeat a run exactly from its run directory (or its config.yaml)."""
+    import json as _json
+
+    from .train.trainer import run
+
+    src = Path(a.run)
+    cfg_path = src / "config.yaml" if src.is_dir() else src
+    prov_path = cfg_path.parent / "provenance.json"
+    if prov_path.exists():
+        prov = _json.loads(prov_path.read_text())
+        from .provenance import _git
+
+        head = _git("rev-parse", "HEAD")
+        if prov.get("git_commit") and head and prov["git_commit"] != head:
+            print(f"note: run was made at commit {prov['git_commit'][:8]}, you are at {head[:8]} "
+                  f"(exact code: git checkout {prov['git_commit'][:8]})")
+        if prov.get("git_dirty"):
+            print(f"note: run had uncommitted changes -> git apply {cfg_path.parent / 'git_diff.patch'}")
+    cfg = OmegaConf.merge(OmegaConf.load(cfg_path), OmegaConf.from_dotlist(list(a.overrides)))
+    print("run dir:", run(cfg))
+
+
+def cmd_manifest(_):
+    from .provenance import write_manifest
+
+    for f, h in write_manifest().items():
+        print(f"{h[:16] if h else 'MISSING':16s}  {f}")
+    print("-> configs/data_manifest.json (commit it)")
+
+
 def cmd_bench(a):
     import pandas as pd
 
@@ -124,7 +203,8 @@ def cmd_bench(a):
 def main(argv=None):
     p = argparse.ArgumentParser(prog="pvf")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name, fn in [("list", cmd_list), ("data", cmd_data), ("smoke", cmd_smoke), ("train", cmd_train), ("bench", cmd_bench)]:
+    for name, fn in [("list", cmd_list), ("data", cmd_data), ("smoke", cmd_smoke), ("train", cmd_train),
+                     ("bench", cmd_bench), ("doctor", cmd_doctor), ("rerun", cmd_rerun), ("data-manifest", cmd_manifest)]:
         s = sub.add_parser(name)
         s.set_defaults(fn=fn)
         s.add_argument("-c", "--config", action="append", default=[], help="extra YAML override file(s)")
@@ -135,6 +215,8 @@ def main(argv=None):
             s.add_argument("-m", "--models", default="")
         if name == "bench":
             s.add_argument("-x", "--experiment", required=True)
+        if name == "rerun":
+            s.add_argument("run", help="run directory (runs/<site>/<model>/<ts>) or its config.yaml")
     a = p.parse_args(argv)
     a.fn(a)
 

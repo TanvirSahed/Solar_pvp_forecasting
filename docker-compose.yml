@@ -1,6 +1,9 @@
 services:
   pvf:
-    build: .
+    build:
+      context: .
+      args:
+        TORCH_CUDA: ${TORCH_CUDA:-cu130}   # cu126 if the host driver is < 580
     image: setlab/pvf:0.1
     working_dir: /workspace
     volumes:

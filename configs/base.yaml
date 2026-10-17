@@ -1,6 +1,7 @@
 # pvf defaults. Data processing follows how the processed datasets were built (30-min P/G/T, Ineichen clear-sky);
 # the experimental protocol below is our own and freely changeable.
 seed: 0
+deterministic: false      # true -> bit-identical reruns on the same GPU (slower)
 site: ssp                 # ssp | nist
 device: cuda
 out_dir: runs
