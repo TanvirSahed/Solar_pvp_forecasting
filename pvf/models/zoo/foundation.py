@@ -7,16 +7,45 @@ tirex    - TiRex (F07; TiRex-2 R13 when released on HF), univariate on P.
 
 They are not trained by the trainer (trainable=False); `python -m pvf train -m chronos2` just evaluates them.
 Context = data.lookback; these models like long context -> try `data.lookback=512` (or more).
-Weights download from Hugging Face on first use (cached in HF_HOME). Fine-tuning hooks: TODO (DT synthetic
-history fine-tuning, report rows 7-8) - start from `self.fm`.
+
+Weights live INSIDE the project as plain files: Data/pretrained/<org>--<name>/ (travels with the Data folder,
+unaffected by clearing ~/.cache/huggingface). If missing they are downloaded there once (`python -m pvf
+fetch-weights` does all of them up front); afterwards loading is fully offline.
+Fine-tuning hooks: TODO (DT synthetic-history fine-tuning, report rows 7-8) - start from `self.fm`.
 """
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import torch
 import torch.nn as nn
 
+from ...data.sites import DATA
 from ..base import ForecastModel, register
+
+PRETRAINED = DATA / "pretrained"
+WEIGHTS = {  # registry name -> default Hugging Face repo
+    "chronos2": "amazon/chronos-2",
+    "timesfm": "google/timesfm-2.5-200m-pytorch",
+    "timesfm3": "google/timesfm-3.0-pytorch",
+    "tirex": "NX-AI/TiRex",
+}
+
+
+def local_weights(repo_id: str) -> Path:
+    """Local folder holding `repo_id`'s weights; downloads them there (not to the user cache) if absent.
+    A local path passed as checkpoint is used as-is."""
+    if Path(repo_id).exists():
+        return Path(repo_id)
+    d = PRETRAINED / repo_id.replace("/", "--")
+    if not (d / ".complete").exists():
+        from huggingface_hub import snapshot_download
+
+        print(f"downloading {repo_id} -> {d} (one time)")
+        snapshot_download(repo_id, local_dir=d, allow_patterns=["*.json", "*.safetensors", "*.ckpt", "*.bin"])
+        (d / ".complete").write_text(repo_id + "\n")
+    return d
 
 
 class _FM(ForecastModel):
@@ -43,12 +72,12 @@ class _FM(ForecastModel):
 
 @register("chronos2")
 class Chronos2(_FM):
-    def __init__(self, spec, checkpoint="amazon/chronos-2", use_covariates=True, batch_size=256, **kw):
+    def __init__(self, spec, checkpoint=WEIGHTS["chronos2"], use_covariates=True, batch_size=256, **kw):
         super().__init__(spec, **kw)
         from chronos import Chronos2Pipeline
 
         object.__setattr__(self, "fm", Chronos2Pipeline.from_pretrained(
-            checkpoint, device_map="cuda" if torch.cuda.is_available() else "cpu"))
+            str(local_weights(checkpoint)), device_map="cuda" if torch.cuda.is_available() else "cpu"))
         self.cov, self.bs = use_covariates, batch_size
         self.qlevels = list(getattr(self.fm, "quantiles", [0.1 * i for i in range(1, 10)]))
 
@@ -86,10 +115,10 @@ class TimesFM(_FM):
 
         self.version = float(version)
         if self.version >= 3:
-            fm = timesfm.TimesFM3Forecaster.from_pretrained(checkpoint or "google/timesfm-3.0-pytorch",
+            fm = timesfm.TimesFM3Forecaster.from_pretrained(str(local_weights(checkpoint or WEIGHTS["timesfm3"])),
                                                             device="cuda" if torch.cuda.is_available() else "cpu")
         else:
-            fm = timesfm.TimesFM_2p5_200M_torch.from_pretrained(checkpoint or "google/timesfm-2.5-200m-pytorch")
+            fm = timesfm.TimesFM_2p5_200M_torch.from_pretrained(str(local_weights(checkpoint or WEIGHTS["timesfm"])))
             fm.compile(timesfm.ForecastConfig(max_context=max(512, spec.lookback), max_horizon=max(128, spec.horizon),
                                               normalize_inputs=True, use_continuous_quantile_head=True,
                                               force_flip_invariance=True, infer_is_positive=True,
@@ -115,11 +144,14 @@ class TimesFM(_FM):
 
 @register("tirex")
 class TiRex(_FM):
-    def __init__(self, spec, checkpoint="NX-AI/TiRex", **kw):
+    def __init__(self, spec, checkpoint=WEIGHTS["tirex"], model_id="TiRex", **kw):
         super().__init__(spec, **kw)
-        from tirex import load_model
+        from tirex.base import PretrainedModel
 
-        object.__setattr__(self, "fm", load_model(checkpoint, device="cuda" if torch.cuda.is_available() else "cpu"))
+        # tirex.load_model() infers the class from an HF id string, so load the local checkpoint via the class
+        ckpt = local_weights(checkpoint) / "model.ckpt"
+        object.__setattr__(self, "fm", PretrainedModel.REGISTRY[model_id].from_pretrained(
+            str(ckpt), backend="torch", device="cuda:0" if torch.cuda.is_available() else "cpu"))
 
     @torch.no_grad()
     def forward(self, batch):

@@ -40,8 +40,7 @@ checksums, GPU, versions). It also contains `git_diff.patch` if the code had unc
 you which commit to check out. With `deterministic=true`, a rerun on the same GPU type is bit-identical (verified).
 Different GPUs agree only to floating-point noise. If the data ever changes, run `python -m pvf data-manifest`
 and commit the result; `doctor` on the other machine will then flag stale copies.
-Foundation-model weights (Chronos-2, TimesFM, TiRex) download from Hugging Face on first use. To avoid that,
-copy `%USERPROFILE%\.cache\huggingface` over as well.
+Foundation-model weights (Chronos-2, TimesFM, TiRex; about 1.5 GB) are stored as plain files in `Data/pretrained/`, so they travel with the Data folder and load fully offline. Clearing `~/.cache/huggingface` does not affect them. On a machine without them, `python -m pvf fetch-weights` (or the first run of such a model) downloads them once into that folder.
 
 ## 2. Data
 

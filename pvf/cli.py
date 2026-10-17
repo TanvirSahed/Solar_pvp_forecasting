@@ -9,6 +9,7 @@
   python -m pvf doctor                                 # is this machine (GPU, packages, data) ready?
   python -m pvf rerun  runs/ssp/patchtst/20261018-101500                # repeat a run from its saved config
   python -m pvf data-manifest                          # (owner) record data checksums after the data changes
+  python -m pvf fetch-weights                          # foundation-model weights -> Data/pretrained (offline after)
 
 Config precedence: configs/base.yaml < configs/models/<model>.yaml < -c file(s) < experiment run entry < key=value
 """
@@ -129,6 +130,11 @@ def cmd_doctor(a):
         line(False, p)
     if not probs:
         line(True, f"{len(data_files())} files identical to configs/data_manifest.json")
+    from .models.zoo.foundation import PRETRAINED, WEIGHTS
+
+    have = [n for n, r in WEIGHTS.items() if (PRETRAINED / r.replace("/", "--") / ".complete").exists()]
+    print(f"  {'OK  ' if have else 'INFO'} foundation weights in Data/pretrained: {have or 'none'}"
+          + ("" if len(have) >= 3 else "  (optional: python -m pvf fetch-weights)"))
     print("model zoo")
     try:
         from .models import zoo  # noqa: F401
@@ -162,6 +168,17 @@ def cmd_rerun(a):
             print(f"note: run had uncommitted changes -> git apply {cfg_path.parent / 'git_diff.patch'}")
     cfg = OmegaConf.merge(OmegaConf.load(cfg_path), OmegaConf.from_dotlist(list(a.overrides)))
     print("run dir:", run(cfg))
+
+
+def cmd_fetch_weights(a):
+    """Put foundation-model weights into Data/pretrained/ (one-time; afterwards everything loads offline)."""
+    from .models.zoo.foundation import WEIGHTS, local_weights
+
+    names = a.models.split(",") if a.models else ["chronos2", "timesfm", "tirex"]
+    for n in names:
+        d = local_weights(WEIGHTS[n])
+        size = sum(f.stat().st_size for f in d.rglob("*") if f.is_file()) / 1e6
+        print(f"  {n:9s} {size:7.0f} MB  {d}")
 
 
 def cmd_manifest(_):
@@ -204,14 +221,15 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="pvf")
     sub = p.add_subparsers(dest="cmd", required=True)
     for name, fn in [("list", cmd_list), ("data", cmd_data), ("smoke", cmd_smoke), ("train", cmd_train),
-                     ("bench", cmd_bench), ("doctor", cmd_doctor), ("rerun", cmd_rerun), ("data-manifest", cmd_manifest)]:
+                     ("bench", cmd_bench), ("doctor", cmd_doctor), ("rerun", cmd_rerun), ("data-manifest", cmd_manifest),
+                     ("fetch-weights", cmd_fetch_weights)]:
         s = sub.add_parser(name)
         s.set_defaults(fn=fn)
         s.add_argument("-c", "--config", action="append", default=[], help="extra YAML override file(s)")
         s.add_argument("overrides", nargs="*", help="key=value OmegaConf dotlist overrides")
         if name == "train":
             s.add_argument("-m", "--model", required=True)
-        if name == "smoke":
+        if name in ("smoke", "fetch-weights"):
             s.add_argument("-m", "--models", default="")
         if name == "bench":
             s.add_argument("-x", "--experiment", required=True)
