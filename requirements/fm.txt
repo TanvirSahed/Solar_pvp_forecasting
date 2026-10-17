@@ -1,0 +1,5 @@
+# Optional: pretrained time-series foundation models (Round 1/2 FM rows of the selection report)
+chronos-forecasting>=2.2     # Chronos-2 (R12), covariate-aware
+timesfm[torch]>=2.0          # TimesFM (R14)
+tirex-ts>=1.1                # TiRex (R13 predecessor; TiRex-2 when released)
+# Moirai (uni2ts) intentionally excluded: pins torch<2.5.

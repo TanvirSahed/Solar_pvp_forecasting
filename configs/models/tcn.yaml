@@ -1,0 +1,1 @@
+model: {name: tcn, channels: 32, dilations: [1, 2, 4, 8], kernel: 3, dropout: 0.1}

@@ -1,0 +1,1 @@
+model: {name: powermamba, embed_len: 64, d_state: 16, kernel: 25, dropout: 0.1, revin: true, external: true}

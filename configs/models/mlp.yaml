@@ -1,0 +1,1 @@
+model: {name: mlp, hidden: [256, 128, 64], dropout: 0.2}

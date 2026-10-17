@@ -1,0 +1,10 @@
+.venv/
+runs/
+results/
+ref/
+Data/
+Resources/
+Paper/
+**/__pycache__/
+**/*.pyc
+.git/

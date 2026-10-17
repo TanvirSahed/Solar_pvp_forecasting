@@ -1,0 +1,450 @@
+[
+ {
+  "id": "R01",
+  "cite": "Nie et al. (2026). SolarBench: A global solar energy nowcasting benchmark",
+  "url": "https://arxiv.org/abs/2609.06187",
+  "file": "R01_SolarBench.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R02",
+  "cite": "Za'ter & Hodge (2026). Empirical Assessment of Time-Series Foundation Models for Power System Forecasting Applications",
+  "url": "https://arxiv.org/abs/2604.22077",
+  "file": "R02_TSFM_PowerSystem_Assessment.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R03",
+  "cite": "Obermeier et al. (2026). FETS Benchmark: Foundation Models Enable Scalable and Generalizable Energy Time Series Forecasting",
+  "url": "https://arxiv.org/abs/2604.22328",
+  "file": "R03_FETS_Benchmark.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R04",
+  "cite": "Longarini et al. (2026). Time series Foundation Models based on Physics-Informed Synthetic Histories for Cold-Start PV Forecasting",
+  "url": "https://arxiv.org/abs/2606.07457",
+  "file": "R04_TSFM_PhysicsSynthetic_ColdStart_PV.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R05",
+  "cite": "Bai et al. (2025). SolarSeer: Ultrafast and accurate 24-hour solar irradiance forecasts",
+  "url": "https://arxiv.org/abs/2508.03590",
+  "file": "R05_SolarSeer.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R06",
+  "cite": "Shi et al. (2026). HDCF-Mamba: Bridging Global Dependencies and Local Dynamics for Multi-Scale PV Forecasting. Energies 19(5), 1315",
+  "url": "https://doi.org/10.3390/en19051315",
+  "file": "R06_HDCF-Mamba.pdf",
+  "status": "OK",
+  "source": "mdpi-cdn"
+ },
+ {
+  "id": "R07",
+  "cite": "Suresh (2025). Benchmarking Transformer Variants for Hour-Ahead PV Forecasting: PatchTST with Adaptive Conformal Inference. Energies 18(18), 5000",
+  "url": "https://doi.org/10.3390/en18185000",
+  "file": "R07_PatchTST_ACI_PV.pdf",
+  "status": "OK",
+  "source": "mdpi-cdn"
+ },
+ {
+  "id": "R08",
+  "cite": "Wang et al. (2026). Probabilistic PV Power Forecasting ... Multi-Scale Temporal-Spatial Attention and CQR. Sustainability 18(2), 739",
+  "url": "https://doi.org/10.3390/su18020739",
+  "file": "R08_MTSA-QRN_CQR.pdf",
+  "status": "OK",
+  "source": "mdpi-cdn"
+ },
+ {
+  "id": "R09",
+  "cite": "Wang et al. (2026). Adapting to drift: Weather-pattern experts for short-term PV power forecasting. Adv. Eng. Informatics 74, 104781",
+  "url": "https://doi.org/10.1016/j.aei.2026.104781",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R10",
+  "cite": "Cao et al. (2026). Dual-Layer Drift Detection and Adaptive Retraining for Ultra-Short-Term PV Forecasting. Energies 19(18), 4391",
+  "url": "https://doi.org/10.3390/en19184391",
+  "file": "R10_DualLayerDrift_Retraining.pdf",
+  "status": "OK",
+  "source": "mdpi-cdn"
+ },
+ {
+  "id": "R11",
+  "cite": "Huang et al. (2026). PV-MM-diffusion: multi-modal diffusion model for ultra-short-term probabilistic PV forecasting. Applied Energy 413, 127816",
+  "url": "https://doi.org/10.1016/j.apenergy.2026.127816",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R12",
+  "cite": "Ansari et al. (2025). Chronos-2: From Univariate to Universal Forecasting",
+  "url": "https://arxiv.org/abs/2510.15821",
+  "file": "R12_Chronos-2.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R13",
+  "cite": "Podest et al. (2026). TiRex-2: Generalizing TiRex to Multivariate Data and Streaming",
+  "url": "https://arxiv.org/abs/2607.01204",
+  "file": "R13_TiRex-2.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R14",
+  "cite": "Das et al. (2024). A Decoder-Only Foundation Model for Time-Series Forecasting",
+  "url": "https://arxiv.org/abs/2310.10688",
+  "file": "R14_TimesFM.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R15",
+  "cite": "Liu et al. (2026). Moirai 2.0: When Less Is More for Time Series Forecasting",
+  "url": "https://arxiv.org/abs/2511.11698",
+  "file": "R15_Moirai-2.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R16",
+  "cite": "Rong et al. (2025). Recurrent Fourier-Kolmogorov Arnold Networks for PV power forecasting. Scientific Reports",
+  "url": "https://doi.org/10.1038/s41598-025-88959-5",
+  "file": "R16_RFKAN.pdf",
+  "status": "OK",
+  "source": "nature"
+ },
+ {
+  "id": "R17",
+  "cite": "Sagingalieva et al. (2025). Photovoltaic power forecasting using quantum machine learning. Solar Energy 302, 114016",
+  "url": "https://doi.org/10.1016/j.solener.2025.114016",
+  "file": "R17_QuantumML_PV.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R18",
+  "cite": "Zhao (2024). A novel digital-twin approach based on transformer for PV power prediction. Scientific Reports",
+  "url": "https://doi.org/10.1038/s41598-024-76711-4",
+  "file": "R18_DigitalTwin_Transformer_PV.pdf",
+  "status": "OK",
+  "source": "nature"
+ },
+ {
+  "id": "R19",
+  "cite": "Menati et al. (2025). PowerMamba: A Deep State Space Model and Comprehensive Benchmark for Time Series Prediction in Electric Power Systems",
+  "url": "https://arxiv.org/abs/2412.06112",
+  "file": "R19_PowerMamba.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R20",
+  "cite": "Hong & Lee (2026). Benchmarking State Space Models, Transformers, and Recurrent Networks for US Grid Forecasting",
+  "url": "https://arxiv.org/abs/2602.21415",
+  "file": "R20_SSM_Transformer_RNN_GridBenchmark.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R21",
+  "cite": "Yang et al. (2025). DEST-GNN: double-explored spatio-temporal GNN for multi-site intra-hour PV forecasting. Applied Energy 378, 124744",
+  "url": "https://doi.org/10.1016/j.apenergy.2024.124744",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R22",
+  "cite": "Sima et al. (2025). Multi-scale fused GCN for multi-site PV power forecasting. Energy Conv. Manag. 333, 119773",
+  "url": "https://doi.org/10.1016/j.enconman.2025.119773",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R23",
+  "cite": "Su et al. (2026). Spatio-temporal GNN with Fourier features for multi-site PV forecasting. EPSR 251, 112171",
+  "url": "https://doi.org/10.1016/j.epsr.2025.112171",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R24",
+  "cite": "Wu et al. (2025). A reinforcement learning-based ensemble forecasting framework for renewable energy forecasting. Renewable Energy 244, 122692",
+  "url": "https://doi.org/10.1016/j.renene.2025.122692",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R25",
+  "cite": "Wang et al. (2026). Context-aware dynamic model selection framework based on PPO for day-ahead PV forecasting. Scientific Reports",
+  "url": "https://doi.org/10.1038/s41598-026-69955-9",
+  "file": "R25_PPO_DynamicModelSelection_PV.pdf",
+  "status": "OK",
+  "source": "s2-oa"
+ },
+ {
+  "id": "R26",
+  "cite": "Cong et al. (2026). Greedy compensatory agent based day-ahead PV forecasting with simplified DQN. Renewable Energy 256, 124616",
+  "url": "https://doi.org/10.1016/j.renene.2025.124616",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R27",
+  "cite": "Lam et al. (2023). GraphCast: Learning skillful medium-range global weather forecasting",
+  "url": "https://arxiv.org/abs/2212.12794",
+  "file": "R27_GraphCast.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R28",
+  "cite": "Price et al. (2024). Probabilistic weather forecasting with machine learning. Nature",
+  "url": "https://doi.org/10.1038/s41586-024-08252-9",
+  "file": "R28_GenCast.pdf",
+  "status": "OK",
+  "source": "nature"
+ },
+ {
+  "id": "R29",
+  "cite": "Bodnar et al. (2025). A foundation model for the Earth system. Nature",
+  "url": "https://doi.org/10.1038/s41586-025-09005-y",
+  "file": "R29_Aurora.pdf",
+  "status": "OK",
+  "source": "nature"
+ },
+ {
+  "id": "R30",
+  "cite": "Pathak et al. (2022). FourCastNet: Adaptive Fourier Neural Operators weather model",
+  "url": "https://arxiv.org/abs/2202.11214",
+  "file": "R30_FourCastNet.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "R31",
+  "cite": "Michalakopoulos et al. (2025). Comparative analysis of federated learning strategies for short-term PV forecasting. Energy Reports 13",
+  "url": "https://doi.org/10.1016/j.egyr.2025.03.043",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "R32",
+  "cite": "Jia et al. (2026). A CEEMDAN-CNN-BiLSTM-SDQN Framework for PV Power Forecasting. Energies 19(7), 1649",
+  "url": "https://doi.org/10.3390/en19071649",
+  "file": "R32_CEEMDAN-CNN-BiLSTM-SDQN.pdf",
+  "status": "OK",
+  "source": "mdpi-cdn"
+ },
+ {
+  "id": "R33",
+  "cite": "Zhao et al. (2026). Probability Forecasting of Daily PV Output Based on Dynamic Copula and RL. Electronics 15(7), 1387",
+  "url": "https://doi.org/10.3390/electronics15071387",
+  "file": "R33_Copula_RL_ProbForecast.pdf",
+  "status": "OK",
+  "source": "mdpi-cdn"
+ },
+ {
+  "id": "R34",
+  "cite": "Xu et al. (2025). Enhancing RL-Based Energy Management Through Transfer Learning With Load and PV Forecasting. IEEE Access",
+  "url": "https://doi.org/10.1109/ACCESS.2025.3548990",
+  "file": "R34_RL_EMS_TransferLearning.pdf",
+  "status": "OK",
+  "source": "ieee-oa"
+ },
+ {
+  "id": "R35",
+  "cite": "Liu et al. (2025). Robust PV Forecasting Against Multi-Modal Adversarial Attack via DRL. IEEE TSTE 16(4)",
+  "url": "https://doi.org/10.1109/TSTE.2025.3548089",
+  "file": "",
+  "status": "MANUAL",
+  "source": ""
+ },
+ {
+  "id": "F01",
+  "cite": "Nie et al. (2023). A Time Series is Worth 64 Words (PatchTST)",
+  "url": "https://arxiv.org/abs/2211.14730",
+  "file": "F01_PatchTST.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F02",
+  "cite": "Liu et al. (2024). iTransformer: Inverted Transformers Are Effective for TS Forecasting",
+  "url": "https://arxiv.org/abs/2310.06625",
+  "file": "F02_iTransformer.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F03",
+  "cite": "Wang et al. (2024). TimeXer: Empowering Transformers for TS Forecasting with Exogenous Variables",
+  "url": "https://arxiv.org/abs/2402.19072",
+  "file": "F03_TimeXer.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F04",
+  "cite": "Gu & Dao (2023). Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
+  "url": "https://arxiv.org/abs/2312.00752",
+  "file": "F04_Mamba.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F05",
+  "cite": "Dao & Gu (2024). Transformers are SSMs (Mamba-2)",
+  "url": "https://arxiv.org/abs/2405.21060",
+  "file": "F05_Mamba-2_SSD.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F06",
+  "cite": "Wang et al. (2024). Is Mamba Effective for Time Series Forecasting?",
+  "url": "https://arxiv.org/abs/2403.11144",
+  "file": "F06_S-Mamba.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F07",
+  "cite": "Auer et al. (2025). TiRex: Zero-Shot Forecasting Across Long and Short Horizons",
+  "url": "https://arxiv.org/abs/2505.23719",
+  "file": "F07_TiRex.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F08",
+  "cite": "Ansari et al. (2024). Chronos: Learning the Language of Time Series",
+  "url": "https://arxiv.org/abs/2403.07815",
+  "file": "F08_Chronos.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F09",
+  "cite": "Kipf & Welling (2017). Semi-Supervised Classification with GCNs",
+  "url": "https://arxiv.org/abs/1609.02907",
+  "file": "F09_GCN.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F10",
+  "cite": "Velickovic et al. (2018). Graph Attention Networks",
+  "url": "https://arxiv.org/abs/1710.10903",
+  "file": "F10_GAT.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F11",
+  "cite": "Brody et al. (2022). How Attentive are Graph Attention Networks?",
+  "url": "https://arxiv.org/abs/2105.14491",
+  "file": "F11_GATv2.pdf",
+  "status": "OK",
+  "source": "arxiv"
+ },
+ {
+  "id": "F12",
+  "cite": "Wu et al. (2019). Graph WaveNet (adaptive adjacency)",
+  "url": "https://arxiv.org/abs/1906.00121",
+  "file": "F12_GraphWaveNet.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F13",
+  "cite": "Wu et al. (2020). Connecting the Dots: Multivariate TS Forecasting with GNNs",
+  "url": "https://arxiv.org/abs/2005.11650",
+  "file": "F13_MTGNN.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F14",
+  "cite": "Ganin et al. (2016). Domain-Adversarial Training of Neural Networks",
+  "url": "https://arxiv.org/abs/1505.07818",
+  "file": "F14_DANN.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F15",
+  "cite": "Romano et al. (2019). Conformalized Quantile Regression",
+  "url": "https://arxiv.org/abs/1905.03222",
+  "file": "F15_CQR.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F16",
+  "cite": "Gibbs & Candes (2021). Adaptive Conformal Inference Under Distribution Shift",
+  "url": "https://arxiv.org/abs/2106.00170",
+  "file": "F16_ACI.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F17",
+  "cite": "Liu et al. (2024). KAN: Kolmogorov-Arnold Networks",
+  "url": "https://arxiv.org/abs/2404.19756",
+  "file": "F17_KAN.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F18",
+  "cite": "Bai et al. (2018). An Empirical Evaluation of Generic Conv. and Recurrent Networks (TCN)",
+  "url": "https://arxiv.org/abs/1803.01271",
+  "file": "F18_TCN.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F19",
+  "cite": "Zeng et al. (2023). Are Transformers Effective for Time Series Forecasting?",
+  "url": "https://arxiv.org/abs/2205.13504",
+  "file": "F19_DLinear.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F20",
+  "cite": "Lim et al. (2021). Temporal Fusion Transformers",
+  "url": "https://arxiv.org/abs/1912.09363",
+  "file": "F20_TFT.pdf",
+  "status": "OK",
+  "source": "cached"
+ },
+ {
+  "id": "F21",
+  "cite": "Wang et al. (2024). Deep Time Series Models: A Comprehensive Survey and Benchmark (TSLib)",
+  "url": "https://arxiv.org/abs/2407.13278",
+  "file": "F21_TSLib_Survey.pdf",
+  "status": "OK",
+  "source": "cached"
+ }
+]

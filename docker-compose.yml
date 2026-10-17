@@ -1,0 +1,30 @@
+services:
+  pvf:
+    build: .
+    image: setlab/pvf:0.1
+    working_dir: /workspace
+    volumes:
+      - ./Data:/workspace/Data
+      - ./runs:/workspace/runs
+      - ./results:/workspace/results
+      - ./ref:/workspace/ref
+      - ./configs:/workspace/configs
+      - ./pvf:/workspace/pvf            # live-edit code without rebuilding
+      - ./notebooks:/workspace/notebooks
+      - hf-cache:/workspace/.cache/huggingface
+    shm_size: 8gb
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  lab:
+    extends: pvf
+    ports: ["8888:8888"]
+    command: jupyter lab --ip=0.0.0.0 --no-browser --allow-root --ServerApp.token=setlab
+volumes:
+  hf-cache:

@@ -1,0 +1,8 @@
+model:
+  name: fusion
+  mode: gate
+  deep_supervision: 0.3
+  branches:
+    - {name: itransformer, d_model: 64, n_layers: 2}
+    - {name: hdcf_mamba, d_model: 64}
+    - {name: tcn}

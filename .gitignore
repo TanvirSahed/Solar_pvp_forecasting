@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+results/
+
+
+.ipynb_checkpoints/
+*.egg-info/
+.cache/
+
+# Papers: large + publisher copyright. Re-create with: python tools/fetch_refs.py
+ref/**/*.pdf
+
+# Plant data (NWPGCL) and unpublished manuscript: share outside git
+Data/
+Resources/
+Paper/

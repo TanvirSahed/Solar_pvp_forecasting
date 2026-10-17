@@ -1,0 +1,7 @@
+# Selection report Sec. 3 mandatory ablation: Concat-Mamba -> GCN+Mamba -> GAT+Mamba -> DT-informed GAT+Mamba
+# python -m pvf bench -x configs/experiments/graph_ablation.yaml site=ssp
+runs:
+  - {tag: concat_mamba, model: {name: mamba}}
+  - {tag: gcn_mamba,    model: {name: graph_mamba, conv: gcn, adj: learned}}
+  - {tag: gat_mamba,    model: {name: graph_mamba, conv: gat, adj: learned}}
+  - {tag: dt_gat_mamba, model: {name: graph_mamba, conv: gat, adj: mixed}}
