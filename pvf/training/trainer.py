@@ -40,6 +40,7 @@ class TrainingRecipe:
     early_stopping_metric: str = "validation_loss"   # validation_loss | nmae | nrmse
     early_stopping_patience: int | None = 10         # None -> train exactly n_epochs (keep the best epoch)
     early_stopping_min_improvement: float = 0.0      # in the metric's units
+    time_limit_minutes: float | None = None          # stop after this much training time (best epoch kept)
     # batches
     batch_size: int = 64
     gradient_accumulation_steps: int = 1     # effective batch = batch_size x this
@@ -162,6 +163,7 @@ def train_model(model, data_bundle, recipe: TrainingRecipe, checkpoint_path=None
     dtype = autocast_dtype(recipe, device)
     gradient_scaler = torch.amp.GradScaler(enabled=dtype == torch.float16)
     best_score, best_state, epochs_without_improvement, history = float("inf"), None, 0, []
+    training_started = time.time()
 
     for epoch in range(recipe.n_epochs):
         if hasattr(model, "on_epoch_start"):
@@ -217,6 +219,9 @@ def train_model(model, data_bundle, recipe: TrainingRecipe, checkpoint_path=None
             if recipe.early_stopping_patience and epochs_without_improvement >= recipe.early_stopping_patience:
                 log(f"early stop: no {recipe.early_stopping_metric} improvement for {recipe.early_stopping_patience} epochs")
                 break
+        if recipe.time_limit_minutes and time.time() - training_started > 60 * recipe.time_limit_minutes:
+            log(f"time limit: stopped after {recipe.time_limit_minutes} min ({epoch + 1} epochs)")
+            break
     if best_state is None:
         raise RuntimeError("validation score was never finite (training diverged) - lower learning_rate or check data")
     model.load_state_dict(best_state)

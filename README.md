@@ -59,6 +59,11 @@ reference paper used. Values a paper leaves out are filled in and listed in `.no
 `docs/training_recipes.md`, with a PDF copy in `Resources/Training_Recipes_Reference_Papers.pdf`; regenerate it
 with `python tools/markdown_to_pdf.py docs/training_recipes.md Resources/Training_Recipes_Reference_Papers.pdf`.
 
+**Train every model at once:** `python tools/run_all_models.py --site ssp --time-limit 15` trains each model with its
+paper recipe (at most 15 min each), scores all of them on the same test windows, and writes
+`Resources/Experiment_Report_<SITE>_<date>.md` and `.pdf`: a ranked summary table, then per model its features,
+recipe, epochs and loss graph. Use `--report-only` to rebuild the report from the last batch.
+
 ### Standard scores (identical for every model)
 All scores are on daytime targets, as a percentage of rated power:
 - nMAE, nRMSE, bias, 95th‑percentile error, R²;

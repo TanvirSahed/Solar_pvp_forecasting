@@ -111,13 +111,22 @@ def plot_training_history(run_dir):
         axis.text(0.5, 0.5, "not trained (evaluation-only model)", ha="center", va="center", color=MUTED_COLOR)
         axis.axis("off")
         return figure
-    axis.plot(history.epoch, history.train_loss, color=SERIES_COLORS[0], linewidth=2, label="train")
-    axis.plot(history.epoch, history.validation_loss, color=SERIES_COLORS[1], linewidth=2, label="validation")
-    best = history.validation_loss.idxmin()
-    axis.scatter([history.epoch[best]], [history.validation_loss[best]], s=40, color=SERIES_COLORS[1], zorder=3,
+    epoch_number = history.epoch + 1                       # 1-based, as in the report tables
+    axis.plot(epoch_number, history.train_loss, color=SERIES_COLORS[0], linewidth=2, label="train")
+    axis.plot(epoch_number, history.validation_loss, color=SERIES_COLORS[1], linewidth=2, label="validation")
+    config_file = Path(run_dir) / "config.yaml"
+    stop_metric = "validation_loss"
+    if config_file.exists():
+        import yaml
+        stop_metric = yaml.safe_load(config_file.read_text())["recipe"].get("early_stopping_metric", stop_metric)
+    best = history[stop_metric].idxmin()                    # the epoch whose weights were kept
+    axis.scatter([epoch_number[best]], [history.validation_loss[best]], s=40, color=SERIES_COLORS[1], zorder=3,
                  edgecolor="white", linewidth=1.5)
-    axis.annotate(f"best epoch {int(history.epoch[best])}", (history.epoch[best], history.validation_loss[best]),
-                  textcoords="offset points", xytext=(6, 8), fontsize=8, color=MUTED_COLOR)
+    axis.annotate(f"best epoch {int(epoch_number[best])} (by {stop_metric})",
+                  (epoch_number[best], history.validation_loss[best]), textcoords="offset points", xytext=(6, 8),
+                  fontsize=8, color=MUTED_COLOR)
+    from matplotlib.ticker import MaxNLocator
+    axis.xaxis.set_major_locator(MaxNLocator(integer=True))
     _style(axis, f"training history - {load_run(run_dir)['run_name']}", "epoch", "loss")
     axis.legend(frameon=False, fontsize=8)
     figure.tight_layout()

@@ -2,7 +2,8 @@
 
     python tools/markdown_to_pdf.py docs/training_recipes.md Resources/Training_Recipes_Reference_Papers.pdf
 
-Supports the subset the reports use: # / ## headings, paragraphs, nested "-" bullets, "1." lists, pipe tables,
+Supports the subset the reports use: # / ## / ### headings, paragraphs, nested "-" bullets, "1." lists, pipe tables,
+![caption](image.png) on its own line (path relative to the Markdown file),
 **bold**, `code`, [text](url). Uses Windows Arial (falls back to Helvetica) so symbols such as -> <= alpha render.
 """
 from __future__ import annotations
@@ -18,7 +19,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (Image, ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer,
+                                Table, TableStyle)
 
 FONT_DIR = Path("C:/Windows/Fonts")
 
@@ -52,6 +54,8 @@ def build_styles(body_font, bold_font):
                                 alignment=TA_LEFT, spaceAfter=4),
         "h2": ParagraphStyle("h2", parent=base["Heading2"], fontName=bold_font, fontSize=13, leading=16,
                              spaceBefore=10, spaceAfter=4, textColor=colors.HexColor("#1c5cab")),
+        "h3": ParagraphStyle("h3", parent=base["Heading3"], fontName=bold_font, fontSize=11, leading=14,
+                             spaceBefore=8, spaceAfter=3),
         "body": ParagraphStyle("body", parent=base["BodyText"], fontName=body_font, fontSize=9.5, leading=12.5,
                                spaceAfter=4),
         "cell": ParagraphStyle("cell", parent=base["BodyText"], fontName=body_font, fontSize=7.6, leading=9.4),
@@ -99,7 +103,15 @@ def parse_list(lines, styles, code_font):
                         leftIndent=12, bulletFontSize=8)
 
 
-def markdown_to_story(markdown: str, styles, code_font, available_width):
+def image_flowable(path: Path, max_width: float, max_height: float):
+    from reportlab.lib.utils import ImageReader
+
+    width, height = ImageReader(str(path)).getSize()
+    scale = min(max_width / width, max_height / height, 1.0)
+    return Image(str(path), width=width * scale, height=height * scale, hAlign="LEFT")
+
+
+def markdown_to_story(markdown: str, styles, code_font, available_width, base_dir=Path(".")):
     story, lines, i = [], markdown.splitlines(), 0
     while i < len(lines):
         line = lines[i]
@@ -107,6 +119,13 @@ def markdown_to_story(markdown: str, styles, code_font, available_width):
             i += 1
         elif line.startswith("# "):
             story.append(Paragraph(inline_markup(line[2:], code_font), styles["title"]))
+            i += 1
+        elif re.fullmatch(r"!\[[^\]]*\]\(([^)]+)\)", line.strip()):
+            path = base_dir / re.fullmatch(r"!\[[^\]]*\]\(([^)]+)\)", line.strip()).group(1)
+            story += [image_flowable(path, available_width * 0.62, 7.5 * cm), Spacer(1, 6)]
+            i += 1
+        elif line.startswith("### "):
+            story.append(Paragraph(inline_markup(line[4:], code_font), styles["h3"]))
             i += 1
         elif line.startswith("## "):
             story.append(Paragraph(inline_markup(line[3:], code_font), styles["h2"]))
@@ -126,7 +145,7 @@ def markdown_to_story(markdown: str, styles, code_font, available_width):
             story += [parse_list(block, styles, code_font), Spacer(1, 3)]
         else:
             block = []
-            while i < len(lines) and lines[i].strip() and not re.match(r"(#|\s*\||\s*(-|\d+\.)\s)", lines[i]):
+            while i < len(lines) and lines[i].strip() and not re.match(r"(#|!\[|\s*\||\s*(-|\d+\.)\s)", lines[i]):
                 block.append(lines[i].strip())
                 i += 1
             story.append(Paragraph(inline_markup(" ".join(block), code_font), styles["body"]))
@@ -142,7 +161,7 @@ def convert(markdown_path: Path, pdf_path: Path):
                                  topMargin=margin, bottomMargin=margin,
                                  title=markdown_path.stem.replace("_", " ").title(), author="SET Lab, MIST")
     story = markdown_to_story(markdown_path.read_text(encoding="utf-8"), styles, code_font,
-                              page_size[0] - 2 * margin)
+                              page_size[0] - 2 * margin, markdown_path.parent)
 
     def footer(canvas, doc):
         canvas.setFont(body_font, 7.5)
