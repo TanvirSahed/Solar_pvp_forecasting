@@ -139,8 +139,6 @@ def metric_definitions(site) -> list[str]:
         "| R² | 1 − Σ_S (ŷ − y)² / Σ_S (y − ȳ)², with ȳ = mean of y over S | share of variance explained (1 = perfect) |",
         "| Smart persistence s | s(t, h) = P(t) · Gcs(t+h) / Gcs(t), set to 0 when Gcs(t) ≤ 1 W/m², clipped to "
         "[0, 1.2] · P_rated | physics reference: current power scaled by the clear-sky (Ineichen) irradiance change |",
-        "| Skill vs persistence | 1 − nRMSE(model) / nRMSE(smart persistence), on the same points S | above 0 beats "
-        "the reference |",
         f"| Ramp MAE % | 100 · mean over ramps of \\|Δŷ − Δy\\|, with Δy = y(step k+1) − y(step k) inside one forecast "
         f"window; a ramp is a pair of scored steps with \\|Δy\\| > {ramp_threshold:g} (i.e. {ramp_threshold:.0%} of P_rated "
         f"per 30 min) | how well fast rises and drops are tracked |",
@@ -149,6 +147,24 @@ def metric_definitions(site) -> list[str]:
         "accuracy of the whole predictive distribution (quantile models only) |",
         "",
     ]
+
+
+def best_lead_times(rows, step_hours=0.5) -> dict:
+    """model -> lead times at which it has the lowest test nRMSE of all models, as merged ranges ("1–6.5 h")."""
+    curves = np.array([r["per_horizon"]["nrmse_pct"] for r in rows])          # [models, steps]
+    winner_per_step = np.nanargmin(curves, axis=0)
+    result = {}
+    for index, r in enumerate(rows):
+        steps = np.flatnonzero(winner_per_step == index)
+        ranges, start = [], None
+        for position, step in enumerate(steps):
+            start = step if start is None else start
+            if position + 1 == len(steps) or steps[position + 1] != step + 1:
+                first, last = (start + 1) * step_hours, (step + 1) * step_hours
+                ranges.append(f"{first:g} h" if first == last else f"{first:g}–{last:g} h")
+                start = None
+        result[r["model"]] = ", ".join(ranges) if ranges else "–"
+    return result
 
 
 def _fmt(value, digits=2):
@@ -210,22 +226,23 @@ def write_report(site: str):
         "## Summary",
         "",
         "| Rank | Model | Recipe source | Epochs run (best) | Train min | Parameters | nMAE % | nRMSE % | Bias % | "
-        "Skill vs persistence | R² | Ramp MAE % | CRPS |",
+        "Best at (lead time) | R² | Ramp MAE % | CRPS |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
+    best_at = best_lead_times(rows)
     for rank, r in enumerate(rows, start=1):
         t = r["test"]
         epochs = f"{r['epochs']} ({r['best_epoch']})" if r["epochs"] else "0"
         lines.append(f"| {rank} | {r['model']} | {r['source']} | {epochs} | {r['minutes']:.1f} | {r['parameters']:,} | "
                      f"{_fmt(t['nmae_pct'])} | {_fmt(t['nrmse_pct'])} | {_fmt(t['nbias_pct'])} | "
-                     f"{_fmt(t['rmse_skill_vs_persistence'], 3)} | {_fmt(t['r2'], 3)} | {_fmt(t['ramp_mae_pct'])} | "
+                     f"{best_at[r['model']]} | {_fmt(t['r2'], 3)} | {_fmt(t['ramp_mae_pct'])} | "
                      f"{_fmt(t.get('crps'), 4)} |")
     for model_name, error in failures:
         lines.append(f"| – | {model_name} | failed | – | – | – | – | – | – | – | – | – | – |")
     lines += [
         "",
-        "Skill vs persistence = 1 − RMSE / RMSE(smart persistence): above 0 beats the physics reference. Smart persistence"
-        " is weak from night origins (it predicts 0), so read skill together with nMAE and nRMSE.",
+        "Best at = the lead times (30‑min steps, 0.5–24 h) where this model has the lowest test nRMSE of all models; "
+        "– = none. The rank uses nRMSE over all 48 steps together.",
         "",
         *horizon_section(rows, site, figures, resources),
         *metric_definitions(site),
