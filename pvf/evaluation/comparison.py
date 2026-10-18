@@ -81,22 +81,25 @@ def _check_series_count(run_dirs):
                          f"(e.g. compare_runs(...).run_dir[:{MAX_SERIES}])")
 
 
-def plot_per_horizon(run_dirs, metric: str = "nrmse_pct", split: str = "test", show_persistence: bool = True):
+def plot_per_horizon(run_dirs, metric: str = "nrmse_pct", split: str = "test", show_persistence: bool = True,
+                     title: str | None = None):
+    """Metric vs lead time (hours ahead), one line per run (at most 8, in rank or chosen order)."""
     import matplotlib.pyplot as plt
 
     run_dirs = list(run_dirs)
     _check_series_count(run_dirs)
     figure, axis = plt.subplots(figsize=(8, 4))
+    step_hours = pd.Timedelta(load_run(run_dirs[0])["resolution"]) / pd.Timedelta("1h")
     for color, run_dir in zip(SERIES_COLORS, run_dirs):
         run = load_run(run_dir)
         curve = run["splits"][split]["per_horizon"][metric]
-        axis.plot(np.arange(1, len(curve) + 1), curve, color=color, linewidth=2, label=run["run_name"])
+        axis.plot(step_hours * np.arange(1, len(curve) + 1), curve, color=color, linewidth=2, label=run["run_name"])
     if show_persistence and metric != "rmse_skill_vs_persistence":
         reference = load_run(run_dirs[0])["splits"][split].get("per_horizon_smart_persistence", {}).get(metric)
         if reference:
-            axis.plot(np.arange(1, len(reference) + 1), reference, color=REFERENCE_COLOR, linewidth=1.5,
+            axis.plot(step_hours * np.arange(1, len(reference) + 1), reference, color=REFERENCE_COLOR, linewidth=1.5,
                       linestyle="--", label="smart persistence")
-    _style(axis, f"{metric} by forecast step ({split})", "steps ahead", metric)
+    _style(axis, title or f"{metric} by lead time ({split})", "hours ahead", metric)
     axis.legend(frameon=False, fontsize=8)
     figure.tight_layout()
     return figure

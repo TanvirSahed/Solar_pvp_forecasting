@@ -64,7 +64,9 @@ def build_styles(body_font, bold_font):
 
 
 def parse_table(lines, styles, code_font, available_width):
-    rows = [[c.strip() for c in line.strip().strip("|").split("|")] for line in lines]
+    # split on unescaped pipes only: "\|" inside a cell is a literal bar (e.g. an absolute value)
+    rows = [[c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+            for line in lines]
     rows = [rows[0]] + [r for r in rows[1:] if not re.fullmatch(r"[\s:\-|]+", "|".join(r))]
     n_columns = len(rows[0])
     data = [[Paragraph(inline_markup(cell, code_font), styles["header" if i == 0 else "cell"])

@@ -25,7 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pvf  # noqa: E402
 from pvf.data.windows import ForecastWindowDataset  # noqa: E402
-from pvf.evaluation.comparison import plot_training_history  # noqa: E402
+from pvf.data.sites import get_site  # noqa: E402
+from pvf.evaluation.comparison import plot_per_horizon, plot_training_history  # noqa: E402
 from pvf.training.paper_recipes import PAPER_RECIPES  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,6 +83,74 @@ def run_batch(site: str, time_limit: float, model_names: list[str]):
     return records
 
 
+LEAD_TIMES_HOURS = (0.5, 1, 3, 6, 12, 24)
+CHART_GROUP_SIZE = 7
+
+
+def horizon_section(rows, site, figures, resources) -> list[str]:
+    """Per-lead-time test nMAE / nRMSE tables + nRMSE-vs-lead-time charts (models in rank groups of 7)."""
+    if not rows:
+        return []
+    step_hours = 0.5
+    steps = [int(round(h / step_hours)) - 1 for h in LEAD_TIMES_HOURS]
+    header = "| Rank | Model | " + " | ".join(f"{h:g} h" for h in LEAD_TIMES_HOURS) + " |"
+    divider = "|---|---|" + "---|" * len(LEAD_TIMES_HOURS)
+    lines = ["## Performance by forecast horizon", "",
+             "Test scores at selected lead times (each column scores only that step ahead; formulas below). "
+             "Smart persistence is listed for reference and left out of the charts: its error grows to several times "
+             "the models' and would flatten their differences.", ""]
+    for metric, label in (("nrmse_pct", "nRMSE %"), ("nmae_pct", "nMAE %")):
+        lines += [f"**Test {label} by lead time**", "", header, divider]
+        for rank, r in enumerate(rows, start=1):
+            curve = r["per_horizon"][metric]
+            lines.append(f"| {rank} | {r['model']} | " + " | ".join(_fmt(curve[s]) for s in steps) + " |")
+        lines.append("")
+    trained = [r for r in rows if r["model"] != "smart_persistence"]
+    for start in range(0, len(trained), CHART_GROUP_SIZE):
+        group = trained[start:start + CHART_GROUP_SIZE]
+        first_rank, last_rank = rows.index(group[0]) + 1, rows.index(group[-1]) + 1
+        figure = plot_per_horizon([r["run_dir"] for r in group], metric="nrmse_pct", split="test",
+                                  show_persistence=False,
+                                  title=f"Test nRMSE by lead time, ranks {first_rank}-{last_rank}")
+        figure_file = figures / f"horizon_nrmse_ranks_{first_rank}_{last_rank}.png"
+        figure.savefig(figure_file, dpi=110, bbox_inches="tight")
+        import matplotlib.pyplot as plt
+        plt.close(figure)
+        lines += [f"![Test nRMSE by lead time, ranks {first_rank}-{last_rank}]({figure_file.relative_to(resources).as_posix()})", ""]
+    return lines
+
+
+def metric_definitions(site) -> list[str]:
+    """The formulas exactly as pvf/evaluation/metrics.py computes them."""
+    ramp_threshold = get_site(site).ramp_threshold_fraction
+    return [
+        "## How the metrics are calculated",
+        "",
+        "Notation: P_rated = inverter AC rating; y = measured AC power / P_rated at a target time; ŷ = forecast / P_rated "
+        "(clipped at 0; for quantile models the 0.5 quantile); S = scored points, i.e. every (test window, step ahead) "
+        "pair whose target was measured and in daylight (clear-sky irradiance > 10 W/m²); N = number of points in S. "
+        "Overall scores use all 48 steps; a lead-time column uses only that step.",
+        "",
+        "| Metric | Formula | Meaning |",
+        "|---|---|---|",
+        "| nMAE % | 100 · (1/N) · Σ_S \\|ŷ − y\\| | typical error, % of rated power |",
+        "| nRMSE % | 100 · √[ (1/N) · Σ_S (ŷ − y)² ] | like nMAE but weights large misses more; ranking metric |",
+        "| Bias % | 100 · (1/N) · Σ_S (ŷ − y) | above 0 = over-forecast on average |",
+        "| R² | 1 − Σ_S (ŷ − y)² / Σ_S (y − ȳ)², with ȳ = mean of y over S | share of variance explained (1 = perfect) |",
+        "| Smart persistence s | s(t, h) = P(t) · Gcs(t+h) / Gcs(t), set to 0 when Gcs(t) ≤ 1 W/m², clipped to "
+        "[0, 1.2] · P_rated | physics reference: current power scaled by the clear-sky (Ineichen) irradiance change |",
+        "| Skill vs persistence | 1 − nRMSE(model) / nRMSE(smart persistence), on the same points S | above 0 beats "
+        "the reference |",
+        f"| Ramp MAE % | 100 · mean over ramps of \\|Δŷ − Δy\\|, with Δy = y(step k+1) − y(step k) inside one forecast "
+        f"window; a ramp is a pair of scored steps with \\|Δy\\| > {ramp_threshold:g} (i.e. {ramp_threshold:.0%} of P_rated "
+        f"per 30 min) | how well fast rises and drops are tracked |",
+        "| Pinball (quantile q) | L_q = max( q · (y − ŷ_q), (q − 1) · (y − ŷ_q) ) | quantile-forecast loss |",
+        "| CRPS | 2 · mean over S and the quantile levels q of L_q (levels 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95) | "
+        "accuracy of the whole predictive distribution (quantile models only) |",
+        "",
+    ]
+
+
 def _fmt(value, digits=2):
     return "–" if value is None or (isinstance(value, float) and np.isnan(value)) else f"{value:.{digits}f}"
 
@@ -124,7 +193,9 @@ def write_report(site: str):
         rows.append({"model": model_name, "source": record["source"], "notes": record.get("notes", []),
                      "test": metrics["splits"]["test"]["overall"], "epochs": len(history), "best_epoch": best_epoch,
                      "minutes": metrics["train_seconds"] / 60, "parameters": metrics["n_parameters"],
-                     "config": config, "stop_reason": stop_reason, "figure": figure_file})
+                     "config": config, "stop_reason": stop_reason, "figure": figure_file, "run_dir": run_dir,
+                     "per_horizon": metrics["splits"]["test"]["per_horizon"],
+                     "persistence_per_horizon": metrics["splits"]["test"].get("per_horizon_smart_persistence")})
     rows.sort(key=lambda r: r["test"][RANK_METRIC])
 
     data = rows[0]["config"]["data"] if rows else {}
@@ -156,6 +227,8 @@ def write_report(site: str):
         "Skill vs persistence = 1 − RMSE / RMSE(smart persistence): above 0 beats the physics reference. Smart persistence"
         " is weak from night origins (it predicts 0), so read skill together with nMAE and nRMSE.",
         "",
+        *horizon_section(rows, site, figures, resources),
+        *metric_definitions(site),
         "## Data used by every model",
         "",
         f"- **Site:** {site.upper()}; resolution {data.get('resolution')}; horizon {data.get('horizon_steps')} steps "
@@ -169,7 +242,8 @@ def write_report(site: str):
     ]
     for rank, r in enumerate(rows, start=1):
         recipe, config = r["config"]["recipe"], r["config"]
-        scheduler = recipe["scheduler"] + (f" {recipe['scheduler_options']}" if recipe["scheduler_options"] else "")
+        scheduler = recipe["scheduler"] + (f" {recipe['scheduler_options']}"
+                                           if recipe["scheduler_options"] and recipe["scheduler"] != "none" else "")
         lines += [
             "",
             f"### {rank}. {r['model']}",
@@ -185,7 +259,8 @@ def write_report(site: str):
             f"| Scheduler | {scheduler} |",
             f"| Batch size | {recipe['batch_size']} |",
             f"| Epochs | {r['epochs']} run of max {recipe['n_epochs']}; best epoch {r['best_epoch'] or '–'} |",
-            f"| Early stopping | {recipe['early_stopping_metric']}, patience {recipe['early_stopping_patience']} |",
+            f"| Early stopping | " + (f"{recipe['early_stopping_metric']}, patience {recipe['early_stopping_patience']}"
+                                    if recipe['early_stopping_patience'] else "off (fixed number of epochs)") + " |",
             f"| Stopped by | {r['stop_reason']} |",
             f"| Training time | {r['minutes']:.1f} min |",
             f"| Test nMAE / nRMSE | {_fmt(r['test']['nmae_pct'])} % / {_fmt(r['test']['nrmse_pct'])} % |",
