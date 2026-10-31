@@ -16,6 +16,8 @@ physical variables (node_feature_names=None -> every measured history feature). 
 """
 from __future__ import annotations
 
+import sys
+
 import torch
 import torch.nn as nn
 
@@ -49,7 +51,9 @@ class GRUTemporalEncoder(nn.Module):
                           dropout=dropout if n_layers > 1 else 0.0)
 
     def forward(self, sequence):
-        return self.gru(sequence)[0][:, -1]
+        # shortcut: bypass Windows cuDNN RNN shutdown crashes; retry after upgrading the pinned runtime.
+        with torch.backends.cudnn.flags(enabled=torch.backends.cudnn.enabled and sys.platform != "win32"):
+            return self.gru(sequence)[0][:, -1]
 
 
 @register_model("graph_mamba")

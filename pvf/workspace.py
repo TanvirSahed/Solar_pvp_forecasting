@@ -1,13 +1,10 @@
-"""Machine-level helpers called from the notebook (there is no command line).
+"""Machine-level helpers called from the notebook or setup scripts.
 
     check_environment()          is this machine ready? (Python, GPU, packages, data files present)
 """
 from __future__ import annotations
 
 import sys
-import time
-
-import pandas as pd
 
 from .data.sites import SITES
 
@@ -27,9 +24,9 @@ def check_environment() -> bool:
     check(sys.version_info[:2] == (3, 11), f"python {sys.version.split()[0]} (expected 3.11)")
     has_gpu = torch.cuda.is_available()
     check(True, f"torch {torch.__version__}, CUDA runtime {torch.version.cuda}")
-    check(has_gpu, f"GPU: {torch.cuda.get_device_name(0) if has_gpu else 'none -> CPU only (slow); check NVIDIA driver'}")
+    check(True, f"device: {torch.cuda.get_device_name(0) if has_gpu else 'CPU (training will be slower)'}")
     if has_gpu and not torch.cuda.is_bf16_supported():
-        print("  NOTE  no bf16 on this GPU -> use TrainingRecipe(mixed_precision='fp16')")
+        print("  NOTE  no bf16 on this GPU -> bf16 requests automatically use fp16")
     for package, required in (("mambapy", True), ("pvlib", True), ("chronos-forecasting", False),
                               ("timesfm", False), ("tirex-ts", False)):
         try:

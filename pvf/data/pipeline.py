@@ -118,7 +118,8 @@ def build_data_bundle(config: DataConfig) -> DataBundle:
 def make_data_loader(dataset, batch_size: int, shuffle: bool, seed: int = 0, num_workers: int = 0) -> DataLoader:
     import torch
 
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True,
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
+                      pin_memory=torch.cuda.is_available(),
                       generator=torch.Generator().manual_seed(seed), persistent_workers=num_workers > 0)
 
 

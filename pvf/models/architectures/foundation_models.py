@@ -99,7 +99,7 @@ class Chronos2(_ZeroShotModel):
 
     @torch.no_grad()
     def forecast(self, model_input):
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(self.device.type, enabled=False):
             outputs = self.pipeline.predict(self._chronos_inputs(model_input),
                                             prediction_length=self.horizon_steps, batch_size=self.batch_size)
         quantiles = torch.stack([o[0] for o in outputs]).permute(0, 2, 1)          # [batch, horizon, n_levels]
@@ -113,7 +113,8 @@ class TimesFM(_ZeroShotModel):
         super().__init__(data_spec, return_quantiles, input_adapter)
         import timesfm
 
-        model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(str(local_weights(weights)))
+        # Eager mode works on CPU and GPU without a separate native compiler toolchain.
+        model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(str(local_weights(weights)), torch_compile=False)
         model.compile(timesfm.ForecastConfig(
             max_context=max(512, data_spec.lookback_steps), max_horizon=max(128, data_spec.horizon_steps),
             normalize_inputs=True, use_continuous_quantile_head=True, force_flip_invariance=True,
@@ -123,7 +124,7 @@ class TimesFM(_ZeroShotModel):
     @torch.no_grad()
     def forecast(self, model_input):
         target = model_input["target_history"].float().cpu().numpy()
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(self.device.type, enabled=False):
             point, quantiles = self.timesfm_model.forecast(horizon=self.horizon_steps, inputs=list(target))
         if self.n_quantiles:
             return self._output(torch.from_numpy(np.asarray(quantiles)[..., 1:]))   # [:, :, 0] is the mean
@@ -144,7 +145,7 @@ class TiRex(_ZeroShotModel):
 
     @torch.no_grad()
     def forecast(self, model_input):
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(self.device.type, enabled=False):
             deciles, _mean = self.tirex_model.forecast(context=model_input["target_history"].float(),
                                                        prediction_length=self.horizon_steps)
         return self._output(deciles)

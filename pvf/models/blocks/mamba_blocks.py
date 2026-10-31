@@ -115,14 +115,15 @@ class MambaMixer(nn.Module):
         step_low_rank, B, C = torch.split(self.selection_projection(x), [self.step_rank, self.state_size,
                                                                          self.state_size], dim=-1)
         delta = F.softplus(self.step_size_projection(step_low_rank))
-        if self.scan_backend == "cuda":
+        if self.scan_backend == "cuda" and x.is_cuda and _cuda_selective_scan is not None:
             y = _cuda_selective_scan(x.transpose(1, 2).contiguous(), delta.transpose(1, 2).contiguous(), A,
                                      B.transpose(1, 2).contiguous(), C.transpose(1, 2).contiguous(),
                                      self.skip_gain.float())
             return y.transpose(1, 2)
         with torch.autocast(device_type=x.device.type, enabled=False):              # scans are unstable in fp16
             arguments = (x.float(), delta.float(), A, B.float(), C.float(), self.skip_gain.float())
-            if self.scan_backend == "parallel":
+            # A saved CUDA model must also run after it is moved to CPU.
+            if self.scan_backend in ("cuda", "parallel") and _parallel_scan is not None:
                 return selective_scan_parallel(*arguments)
             return selective_scan_sequential(*arguments)
 

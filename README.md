@@ -2,7 +2,31 @@
 
 Build, change, fuse and compare deep forecasting models for PV AC power, using data from NWPGCL Sirajganj (SSP, 2025)
 and the NIST ground array (2017). The candidate models come from `Resources/SET_Lab_Dl_Model_Selection.pdf`.
-**Everything runs from one notebook: `notebooks/run_experiment.ipynb`.** There is no command line.
+**Start with `notebooks/run_experiment.ipynb` for interactive experiments**, or use `tools/run_all_models.py` for a batch.
+
+For setup from scratch, a file-by-file project map, and step-by-step experiment instructions, see the
+[setup and experiment guide](docs/experiment_guide.md).
+
+## Quick start
+
+Use Python 3.11 and VS Code with Microsoft's Python and Jupyter extensions. Install [Git](https://git-scm.com/install/windows), then clone:
+
+```powershell
+git clone https://github.com/TanvirSahed/Solar_pvp_forecasting.git
+cd Solar_pvp_forecasting
+```
+
+Obtain the processed `Data/` folder from the project owner and copy it into this folder before setup.
+Datasets are shared separately; GitHub does not include them. The [guide lists the four required Parquet files](docs/experiment_guide.md#16-obtain-the-datasets-separately).
+Pretrained model weights download automatically when first needed.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1
+```
+
+On Linux, run `bash setup_venv.sh` instead. Setup selects a GPU or CPU build automatically.
+Open this folder in VS Code, open `notebooks/run_experiment.ipynb`, select the `.venv` kernel,
+then follow the **CHOOSE** cells from top to bottom. No Docker installation is needed.
 
 ## How the pieces connect
 
@@ -119,22 +143,17 @@ input and keeps the rest. Steps adapt to the selected features and skip missing 
 
 **A loss, optimizer or scheduler:** one line in `pvf/training/losses.py` or `pvf/training/optimizers.py`.
 
-## Setup on a new machine
-Needs an NVIDIA GPU and driver, git, and either Python 3.11 or Docker.
-
-```powershell
-git clone <repo-url> powerForecasting_model; cd powerForecasting_model
-# copy Data/ (including Data/pretrained/), plus Resources/ and ref/ if wanted, into this folder
-powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1        # Linux: bash setup_venv.sh
-```
+## Environment notes
+Needs Git and Python 3.11. An NVIDIA GPU and driver are optional; the same notebook also runs on CPU.
 
 The script installs the exact package versions from `requirements/lock-*.txt`. It picks the PyTorch CUDA build
 from the driver: CUDA 13.0 for driver 580 or newer, CUDA 12.6 for older drivers, otherwise CPU. It then runs
-`pvf.check_environment()`, which must print READY (GPU, packages, data files present). Open `notebooks/run_experiment.ipynb` with the `.venv` kernel.
-
-**Docker:** run `docker compose build` (with `TORCH_CUDA=cu126` in front if the driver is older than 580), then
-`docker compose up`. JupyterLab opens at http://localhost:8888 (token `setlab`). Code, data, runs and notebooks are
-mounted from the folder, so edits need no rebuild.
+`pvf.check_environment()`, which prints READY when packages and data files are present on either CPU or GPU.
+To explicitly install the CPU build, use `powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1 -Cuda cpu`
+(Linux: `bash setup_venv.sh cpu`). Open `notebooks/run_experiment.ipynb` with the `.venv` kernel.
+Training selects CUDA when available, otherwise CPU with full precision. GPUs without bf16 support use fp16 automatically.
+On Windows, recurrent layers use PyTorch's native implementation on the selected device to avoid a shutdown crash
+in the pinned cuDNN runtime; GPU training remains available but may be slower for LSTM/GRU.
 
 **Sharing experiments:** commit code changes and push; your colleague pulls and runs the notebook. A run folder can
 be copied over and loaded with `pvf.load_trained_model(run_dir)`.

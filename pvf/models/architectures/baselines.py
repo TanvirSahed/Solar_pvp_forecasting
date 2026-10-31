@@ -5,6 +5,8 @@ lstm, gru          recurrent encoder (optionally bidirectional, attention poolin
 """
 from __future__ import annotations
 
+import sys
+
 import torch
 import torch.nn as nn
 
@@ -41,7 +43,9 @@ class _RecurrentForecaster(ForecastModel):
                                           dropout=dropout)
 
     def encode(self, model_input):
-        hidden_states, _ = self.recurrent_encoder(model_input["history_features"])   # [batch, time, state_size]
+        # shortcut: bypass Windows cuDNN RNN shutdown crashes; retry after upgrading the pinned runtime.
+        with torch.backends.cudnn.flags(enabled=torch.backends.cudnn.enabled and sys.platform != "win32"):
+            hidden_states, _ = self.recurrent_encoder(model_input["history_features"])   # [batch, time, state_size]
         if self.pooling == "last":
             return hidden_states[:, -1]
         weights = torch.softmax(self.attention_scorer(hidden_states), dim=1)            # [batch, time, 1]

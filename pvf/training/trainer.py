@@ -45,7 +45,7 @@ class TrainingRecipe:
     batch_size: int = 64
     gradient_accumulation_steps: int = 1     # effective batch = batch_size x this
     gradient_clip_norm: float | None = 1.0
-    mixed_precision: str = "bf16"            # bf16 | fp16 | none
+    mixed_precision: str = "bf16"            # bf16 (fp16 if unsupported) | fp16 | none; CPU uses float32
     # data use and initialisation
     train_fraction: float = 1.0              # < 1: random share of training windows (data-efficiency curves)
     initialize_from_run: str | None = None   # run folder whose best weights start this training (transfer)
@@ -58,7 +58,8 @@ def seed_everything(seed: int):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def pick_device() -> torch.device:
@@ -68,6 +69,8 @@ def pick_device() -> torch.device:
 def autocast_dtype(recipe: TrainingRecipe, device: torch.device):
     if device.type != "cuda":
         return None
+    if recipe.mixed_precision == "bf16" and not torch.cuda.is_bf16_supported():
+        return torch.float16
     return {"bf16": torch.bfloat16, "fp16": torch.float16}.get(recipe.mixed_precision)
 
 
@@ -134,6 +137,7 @@ def train_model(model, data_bundle, recipe: TrainingRecipe, checkpoint_path=None
     Returns the per-epoch history (losses, validation nMAE / nRMSE, learning rate, seconds)."""
     seed_everything(recipe.seed)
     device = pick_device()
+    log(f"device: {device}")
     if not model.is_trainable:
         model.to(device)
         log(f"{type(model).__name__} has nothing to train - evaluation only")
@@ -161,6 +165,7 @@ def train_model(model, data_bundle, recipe: TrainingRecipe, checkpoint_path=None
     scheduler, scheduler_step_on = make_scheduler(recipe.scheduler, optimizer, recipe.n_epochs, steps_per_epoch,
                                                   **recipe.scheduler_options)
     dtype = autocast_dtype(recipe, device)
+    log(f"training precision: {dtype or torch.float32}")
     gradient_scaler = torch.amp.GradScaler(enabled=dtype == torch.float16)
     best_score, best_state, epochs_without_improvement, history = float("inf"), None, 0, []
     training_started = time.time()

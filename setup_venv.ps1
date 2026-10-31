@@ -3,7 +3,7 @@
 # Creates .venv (Python 3.11), installs the exact package versions from requirements\lock-windows.txt,
 # picks the PyTorch CUDA build that matches the installed NVIDIA driver, then checks the machine.
 #   -Cuda cu130|cu126|cpu   force a build instead of auto-detect
-param([string]$Cuda = "auto")
+param([ValidateSet("auto", "cu130", "cu126", "cpu")][string]$Cuda = "auto")
 $ErrorActionPreference = "Stop"
 
 if (-not (Get-Command py -ErrorAction SilentlyContinue) -or -not (py -0 | Select-String "3.11")) {
@@ -18,11 +18,19 @@ if ($Cuda -eq "auto") {
         Write-Host "NVIDIA driver $drv -> PyTorch build $Cuda"
     } catch { Write-Host "No NVIDIA driver found -> CPU build (training will be slow)" -ForegroundColor Yellow }
 }
-if (-not (Test-Path .venv)) { py -3.11 -m venv .venv }
+if (-not (Test-Path .venv)) {
+    py -3.11 -m venv .venv
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 $py = ".\.venv\Scripts\python.exe"
 & $py -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $py -m pip install -r "requirements\torch-$Cuda.txt"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $py -m pip install -r requirements\lock-windows.txt
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $py -m pip install --no-deps -e .
-& $py -c "import pvf; pvf.check_environment()"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& $py -c "import pvf; raise SystemExit(0 if pvf.check_environment() else 1)"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "`nOpen notebooks\run_experiment.ipynb with the .venv kernel (VS Code: pick .venv as kernel, or run .\.venv\Scripts\jupyter lab)" -ForegroundColor Green

@@ -9,7 +9,14 @@ __pycache__/
 *.egg-info/
 .cache/
 
-# Papers: large + publisher copyright. Re-create with: python tools/fetch_refs.py
+# Local coding-agent settings and optional container setup
+/.agents/
+/.claude/
+/.dockerignore
+/Dockerfile
+/docker-compose*.yml
+
+# Reference PDFs are shared separately; links are in ref/README.md.
 ref/**/*.pdf
 
 # Plant data (NWPGCL) and unpublished manuscript: share outside git

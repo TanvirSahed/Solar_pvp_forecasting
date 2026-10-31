@@ -69,15 +69,18 @@ def test_experiment_config_round_trip(tmp_path):
     assert ExperimentConfig.load(tmp_path / "config.yaml") == config
 
 
-def test_every_model_trains_one_step(data_bundle):
+@pytest.mark.parametrize("device_name", ["cpu", "cuda"])
+def test_every_model_trains_one_step(data_bundle, device_name):
     """Every registered model builds, runs forward and backward on a real batch (zero-shot ones forward only)."""
     import torch
 
     from pvf.models import architectures  # noqa: F401
     from pvf.models.base import MODEL_REGISTRY
-    from pvf.training.trainer import loss_function_for, move_to_device, pick_device
+    from pvf.training.trainer import loss_function_for, move_to_device
 
-    device = pick_device()
+    if device_name == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA is unavailable")
+    device = torch.device(device_name)
     batch = move_to_device(pvf.sample_batch(data_bundle, batch_size=8), device)
     for name, model_class in sorted(MODEL_REGISTRY.items()):
         if getattr(model_class, "needs_weight_download", False):
@@ -87,3 +90,37 @@ def test_every_model_trains_one_step(data_bundle):
         assert torch.isfinite(loss), name
         if loss.requires_grad:
             loss.backward()
+
+
+@pytest.mark.parametrize("device_name", ["cpu", "cuda"])
+def test_experiment_saves_and_reloads_on_cpu_and_gpu(data_bundle, device_name, monkeypatch, tmp_path):
+    import importlib
+    from dataclasses import replace
+
+    import torch
+    from torch.utils.data import Subset
+
+    from pvf.training.trainer import predict
+
+    if device_name == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA is unavailable")
+    if device_name == "cpu":
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    module = importlib.import_module("pvf.experiment")
+    monkeypatch.setattr(module, "RESULTS_LOG", tmp_path / "experiment_log.csv")
+    small_bundle = replace(data_bundle, datasets={
+        name: Subset(dataset, np.random.default_rng(0).choice(len(dataset), min(32, len(dataset)), replace=False).tolist())
+        for name, dataset in data_bundle.datasets.items()
+    })
+    config = pvf.ExperimentConfig(
+        model_name="lstm", model_hyperparameters={"hidden_size": 8, "n_layers": 2, "dropout": 0.0},
+        data=pvf.DataConfig(site=data_bundle.spec.site),
+        recipe=pvf.TrainingRecipe(n_epochs=1, batch_size=4),
+    )
+    result = pvf.run_experiment(config, data_bundle=small_bundle, runs_dir=tmp_path / "runs")
+    assert len(result.metrics["history"]) == 1
+    assert np.isfinite(result.metrics["splits"]["test"]["overall"]["nrmse_pct"])
+    assert (result.run_dir / "best_model.pt").is_file()
+    loaded = pvf.load_trained_model(result.run_dir)
+    predictions = predict(loaded, small_bundle.datasets["test"], config.recipe, device=torch.device("cpu"))
+    assert np.isfinite(predictions["forecast"]).all()
