@@ -129,7 +129,7 @@ class MyModel(ForecastModel):
                                                                  model_input["future_features"]))}
 ```
 
-New files must be imported in `pvf/models/architectures/__init__.py`. `python -m pytest -q tests` then checks that every model trains one step.
+New files must be imported in `pvf/models/architectures/__init__.py`.
 
 **Fusing two models:** follow `pvf/models/architectures/fusion_example.py`, which fuses iTransformer's variable
 encoder with HDCF‑Mamba's temporal encoder through a learned gate. Its docstring gives the 4‑step recipe; copy it

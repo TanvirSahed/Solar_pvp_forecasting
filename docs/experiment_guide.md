@@ -138,7 +138,7 @@ powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1 -Cuda cu126
 powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1 -Cuda cpu
 ```
 
-The requirements include PyTorch, NumPy, pandas, PyArrow, pvlib, mambapy, plotting tools, JupyterLab, ipykernel, pytest, and the foundation-model libraries. You do not need to install these individually, install Anaconda, or download Jupyter separately.
+The requirements include PyTorch, NumPy, pandas, PyArrow, pvlib, mambapy, plotting tools, JupyterLab, ipykernel, and the foundation-model libraries. You do not need to install these individually, install Anaconda, or download Jupyter separately.
 
 Let package installation finish. The setup script stops on installation errors or a failed readiness check. Verify explicitly:
 
@@ -224,7 +224,6 @@ The helper creates a `.complete` marker after each successful download. For an o
 | `docs/training_recipes.md` | Reference-paper settings and documented implementation differences |
 | `tools/run_all_models.py` | Batch experiments and Markdown/PDF report generation |
 | `tools/markdown_to_pdf.py` | Converts Markdown reports to PDF |
-| `tests/test_pipeline.py` | Checks data splits, leakage prevention, metrics, adapters, and model forward/backward passes |
 | `runs/` | Individual experiment configurations, checkpoints, predictions, and metrics |
 | `results/` | Experiment CSV log and batch manifests |
 | `Resources/` | Lab reference material and generated batch reports/figures |
@@ -567,14 +566,6 @@ The manifest is saved as models complete, but a new batch invocation starts a ne
 | No holdout metrics | Set nonempty holdout months, include `"holdout"` in evaluation splits, and confirm that the dataset has valid windows there |
 | Foundation-model download fails | Check access to its Hugging Face repository or copy a complete local weight folder from a working machine |
 | Report-only command fails | Check that `results/batch_<site>.json` exists and its referenced run folders are still accessible |
-
-For code changes, the existing checks can be run with:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q tests
-```
-
-The model test checks both CPU and CUDA when available, and skips CUDA on machines without it. It skips the external-weight foundation models; passing it does not validate their downloads or inference.
 
 ## 5. Linux setup equivalent
 

@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 /runs/
 /results/
+/tests/
 
 
 .ipynb_checkpoints/
