@@ -651,7 +651,7 @@ To repeat the full comparison of reports s3 and s4, run the three studies in ord
 .\.venv\Scripts\python.exe tools/nwp_study.py --site ssp --seeds 0,1,2,3,4 --time-limit 20
 ```
 
-The batch takes about two hours, each study about an hour. Copying the `runs/` and `results/` folders from a machine that has already run them replaces the first two steps.
+The batch takes about two hours on an RTX 3060, each study about an hour. Run them on the machine that will hold the results: the study manifests in `results/` record absolute run-folder paths, so copied `runs/` and `results/` folders only work at the same path.
 
 ### 3.10 Use a consistent research protocol
 
