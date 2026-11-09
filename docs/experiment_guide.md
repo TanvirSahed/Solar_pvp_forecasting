@@ -1,23 +1,22 @@
 # Setup and experiment guide
 
-This guide covers, in order: setting up a new machine, understanding the files, and running experiments. Python and VS Code are assumed to be installed. The main instructions use **Windows PowerShell**; a Linux setup is included at the end.
+This guide covers, in order: setting up a new machine, understanding the files, and running experiments. Nothing has to be installed in advance, not even Python: the setup downloads its own. The main instructions use **Windows**; a Linux setup is included at the end.
 
 Run terminal commands from the project root, the folder containing `pyproject.toml`, `setup_venv.ps1`, and `pvf/`. Run Python examples in a notebook cell unless a block is labelled `powershell` or `bash`.
 
 ## 1. Set up a new machine
 
-### 1.1 Check the installed Python
+### 1.1 Quick path (no Python installation)
 
-Open **Terminal > New Terminal** in VS Code and select PowerShell. Check:
+1. Get the project folder (section 1.5) and copy the `Data/` folder into it (section 1.6).
+2. Double-click **`setup.bat`**. The first run downloads about 3 GB and takes 5 to 15 minutes.
+3. Double-click **`start_notebook.bat`**. The experiment notebook opens in the browser.
 
-```powershell
-py -0
-py -3.11 --version
-```
+`setup.bat` downloads [uv](https://docs.astral.sh/uv/), a single-file Python manager, into `.tools/`. uv then downloads a private Python 3.11 into `.tools/python` and builds `.venv` from the pinned package versions. Any Python already installed on the machine is ignored, so a broken or different Python installation cannot interfere. Everything stays inside the project folder apart from uv's download cache (`%LOCALAPPDATA%\uv\cache`). To start over, delete `.venv` and `.tools` and run `setup.bat` again.
 
-Use **Python 3.11** for the supplied setup scripts and pinned dependencies. Although `pyproject.toml` allows Python 3.12 too, the scripts and environment checker expect 3.11. If your installed Python is a different version, add 3.11 before continuing. If `python --version` works but `py` does not, the Windows setup script also needs the Python launcher.
+Sections 1.2 to 1.4 are optional for this path: Git only if you clone instead of downloading a ZIP, VS Code only if you prefer it to the browser, and an NVIDIA driver only for GPU training.
 
-### 1.2 Download Git
+### 1.2 Download Git (optional)
 
 Download and install [Git for Windows](https://git-scm.com/install/windows), using the installer defaults. Alternatively, if Windows Package Manager is available:
 
@@ -31,7 +30,7 @@ Close and reopen the terminal, then check:
 git --version
 ```
 
-### 1.3 Install the VS Code extensions
+### 1.3 Install the VS Code extensions (optional)
 
 Open **Extensions** with `Ctrl+Shift+X`. Install these Microsoft extensions:
 
@@ -105,17 +104,19 @@ The loader expects naive local timestamps: SSP uses Bangladesh time; NIST uses `
 
 Only the selected site's files are needed to build its data bundle. However, `pvf.check_environment()` checks **both sites**, so missing files for the other site still produce FAIL lines.
 
+The weather-forecast (NWP) features read `Data/nwp/<site>_<model>_<year>.parquet`, for example `Data/nwp/ssp_ecmwf_ifs025_2025.parquet`. Copy that folder too; without it the archive is downloaded once on first use, which needs internet access.
+
 Optionally obtain `Resources/`, `ref/` PDFs, and `Paper/` from the lab for reports and reference material. They are not required to train a model. `Data/cache/` is generated automatically.
 
 ### 1.7 Create the environment and download packages
 
-From the project root, run:
+Double-click `setup.bat`, or run from the project root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1
 ```
 
-This creates `.venv`, upgrades pip, downloads the selected PyTorch build, installs packages pinned in `requirements/lock-windows.txt`, installs `pvf` in editable mode, and prints the environment check. Editable installation means changes in `pvf/` are used without reinstalling the project.
+This downloads uv and a private Python 3.11 into `.tools/` (first run only), creates `.venv`, downloads the selected PyTorch build, installs the packages pinned in `requirements/lock-windows.txt`, installs `pvf` in editable mode, and prints the environment check. Editable installation means changes in `pvf/` are used without reinstalling the project. Running it again completes or repairs an interrupted setup.
 
 The Windows script currently chooses:
 
@@ -125,7 +126,7 @@ The Windows script currently chooses:
 | 528 through 579 | `requirements/torch-cu126.txt` |
 | Older, or no detected NVIDIA driver | `requirements/torch-cpu.txt` |
 
-These are the script's selection rules, not a guarantee that every GPU supports every build. Confirm the result with the check below. To force a build, run **one** of:
+These are the script's selection rules, not a guarantee that every GPU supports every build. Confirm the result with the check below. To force a build, run **one** of (`setup.bat -Cuda cpu` works too):
 
 ```powershell
 # NVIDIA CUDA 13.0 build
@@ -175,7 +176,7 @@ Both paths should point into this project. Selecting a terminal interpreter and 
 .\.venv\Scripts\python.exe -m ipykernel install --user --name pvf --display-name "Python (pvf)"
 ```
 
-Then select **Python (pvf)**. As an alternative to VS Code notebooks, start JupyterLab:
+Then select **Python (pvf)**. As an alternative to VS Code notebooks, double-click `start_notebook.bat`, or start JupyterLab yourself:
 
 ```powershell
 .\.venv\Scripts\jupyter.exe lab
@@ -215,7 +216,9 @@ The helper creates a `.complete` marker after each successful download. For an o
 |---|---|
 | `README.md` | Project overview, conventions, model contract, and extension examples |
 | `notebooks/run_experiment.ipynb` | Main interactive workflow: choose a model, prepare data, inspect inputs, train, plot, compare, and tune |
-| `setup_venv.ps1`, `setup_venv.sh` | Windows and Linux environment setup |
+| `setup.bat`, `start_notebook.bat` | Double-click setup and notebook launcher (Windows) |
+| `setup_venv.ps1`, `setup_venv.sh` | Windows and Linux environment setup (called by `setup.bat`) |
+| `.tools/` | uv and its private Python 3.11, created by setup (not in Git) |
 | `pyproject.toml` | Package metadata and editable-install configuration; dependency pins live in `requirements/` |
 | `requirements/lock-windows.txt`, `lock-linux.txt` | Pinned Python dependencies for each operating system |
 | `requirements/torch-*.txt` | Separate pinned CPU / CUDA PyTorch builds |
@@ -223,9 +226,12 @@ The helper creates a `.complete` marker after each successful download. For an o
 | `pvf/` | Data preparation, model definitions, training, evaluation, and experiment orchestration |
 | `docs/training_recipes.md` | Reference-paper settings and documented implementation differences |
 | `tools/run_all_models.py` | Batch experiments and Markdown/PDF report generation |
+| `tools/fusion_study.py` | Fusion study: diagnoses the batch models, trains the evidence-driven fusions over several seeds, writes the fusion report |
+| `tools/nwp_study.py` | NWP study: retrains PatchTST and the fusions with archived weather forecasts and compares them with the fusion study |
+| `tools/report_names.py` | Names reports in `results/` as `<main factor>_s<N>` in chronological order |
 | `tools/markdown_to_pdf.py` | Converts Markdown reports to PDF |
 | `runs/` | Individual experiment configurations, checkpoints, predictions, and metrics |
-| `results/` | Experiment CSV log and batch manifests |
+| `results/` | Experiment CSV log, batch manifests (`batch_<site>.json`), fusion and NWP study manifests (`fusion_<site>.json`, `nwp_<site>.json`) and their summaries |
 | `Resources/` | Lab reference material and generated batch reports/figures |
 | `ref/README.md`, `ref/` | Reference-paper links and separately shared PDFs |
 | `Paper/` | Separately shared manuscript material |
@@ -253,7 +259,8 @@ The helper creates a `.complete` marker after each successful download. For an o
 | `pvf/models/architectures/rfkan.py` | Recurrent Fourier KAN |
 | `pvf/models/architectures/probabilistic.py` | `mtsa_qrn` and `dt_dann` |
 | `pvf/models/architectures/foundation_models.py` | Chronos-2, TimesFM, TiRex, and local weight downloads |
-| `pvf/models/architectures/fusion_example.py` | Worked iTransformer + HDCF-Mamba fusion |
+| `pvf/models/architectures/fusion_example.py` | Worked iTransformer + HDCF-Mamba fusion (representation-level) |
+| `pvf/models/architectures/fusion_models.py` | Evidence-driven fusions: PatchTST + a partner, mixed per lead time by a weather-regime gate |
 | `pvf/models/architectures/__init__.py` | Imports architectures so their registered names become available |
 | `pvf/models/blocks/` | Shared heads, normalization, Mamba, graph, and other layers |
 | `pvf/training/paper_recipes.py` | Per-model paper presets, recommended lookback durations, and notes |
@@ -349,7 +356,15 @@ List the available features:
 display(pvf.describe_features())
 ```
 
-`history_feature_names` selects observations available up to the forecast origin. `future_feature_names` selects values known for target times: clear sky, calendar features, and yesterday's power. Future measured irradiance or temperature is unavailable in a real forecast. The explicit `*_oracle` features use those measurements as perfect forecasts and must be labelled as upper-bound experiments.
+`history_feature_names` selects observations available up to the forecast origin. `future_feature_names` selects values known for target times: clear sky, calendar features, yesterday's power, and archived weather forecasts (NWP). Future measured irradiance or temperature is unavailable in a real forecast. The explicit `*_oracle` features use those measurements as perfect forecasts and must be labelled as upper-bound experiments.
+
+To give a model a weather forecast, add the NWP features to the future inputs:
+
+```python
+data_config.future_feature_names += ["nwp_irradiance", "nwp_cloud_cover", "nwp_temperature"]
+```
+
+They come from the Open-Meteo archive of past forecast runs (ECMWF IFS by default, `pvf/data/nwp.py`). Each target time gets the forecast issued about 24 h earlier; the `*_day2` versions use the forecast issued about 48 h earlier, which predates every origin of a 24 h horizon. The archive is downloaded once into `Data/nwp/` and then read offline, so copy that folder with `Data/` to another machine. Without the file and without internet the features become zeros, with a printed note. In the fusion models, `model_hyperparameters = {"gate_reads_future": True}` lets the gate read each lead time's future inputs, including the NWP sky forecast.
 
 With the default `ac_power_yesterday` future feature, the horizon must be at most one day. For longer horizons, remove it and choose other valid future features.
 
@@ -508,7 +523,7 @@ The batch script loads paper presets, trains/evaluates the selected models, and 
 .\.venv\Scripts\python.exe tools/run_all_models.py --site ssp --models lstm,patch_tst,hdcf_mamba --time-limit 15
 ```
 
-Run every model with a preset:
+Run every model with a preset (the paper models plus the fusion models, whose preset is the fusion study's shared recipe):
 
 ```powershell
 .\.venv\Scripts\python.exe tools/run_all_models.py --site ssp --time-limit 15
@@ -535,7 +550,110 @@ The report includes test rankings, per-horizon scores, recipes, training histori
 
 The manifest is saved as models complete, but a new batch invocation starts a new manifest; it does not automatically resume unfinished models. Preserve `results/batch_<site>.json` before starting another batch for that site. Reports with the same site and date reuse the same filenames. Individual timestamped run folders remain available.
 
-### 3.8 Use a consistent research protocol
+### 3.8 Fuse models
+
+Two kinds of fused model are registered:
+
+| Model name | What is fused | Mixing |
+|---|---|---|
+| `fusion_itransformer_hdcf` | iTransformer variable encoder + HDCF-Mamba temporal encoder | per-feature gate over the two representations |
+| `patch_tst_conv_gate` | PatchTST + DT-DANN's causal-CNN/transformer encoder | per-lead-time gate over the two forecasts |
+| `patch_tst_mamba_gate` | PatchTST + Mamba recurrent encoder | per-lead-time gate over the two forecasts |
+| `patch_tst_variable_gate` | PatchTST + iTransformer variable tokens | per-lead-time gate over the two forecasts |
+
+The three `patch_tst_*_gate` models were designed from measured weaknesses (clear-sky days, afternoon ramps, channel
+independence). Their gate is predicted from the recent weather regime (last-day clearness) and the latest
+observations, and each branch is also trained on its own so neither is switched off. Train one like any other model:
+in the notebook set `model_name = "patch_tst_mamba_gate"`; with `use_paper_recipe = True` it uses the fusion study's
+shared recipe (Adam 1e-4, plateau scheduler, up to 30 epochs, 48 h lookback).
+
+See how much of the forecast each branch provides (1 = PatchTST only, per lead time):
+
+```python
+import torch
+
+batch = pvf.sample_batch(data_bundle, batch_size=8)
+model.eval()
+with torch.no_grad():
+    output = model({k: v.to(next(model.parameters()).device) for k, v in batch.items()})
+print(output["gate"].mean(0))        # one value per lead time
+```
+
+To fuse two other models, give `_RegimeGatedFusion` any two forecasters in `fusion_models.py` and register it:
+
+```python
+@register_model("lstm_dt_gate")
+class LSTMConvGate(_RegimeGatedFusion):
+    """Say which weakness of the first model the second one covers."""
+
+    def __init__(self, data_spec, **gate_options):
+        super().__init__(data_spec, LSTMForecaster(data_spec, hidden_size=128),
+                         DigitalTwinTransformerDANN(data_spec, domain_loss_weight=0.0), **gate_options)
+```
+
+(The first model's output is weighted by the gate `g`, the second by `1 - g`; import the classes you use.) For a
+representation-level fusion, follow the 4-step recipe in `fusion_example.py` instead.
+
+**Fusion study.** `tools/fusion_study.py` repeats the whole analysis for a site: it diagnoses where each trained
+batch model is weak (lead time, sky condition, time of day, bias), measures how correlated their errors are, tests
+prediction-level combination of the finished models, trains the control (PatchTST) and the three fusions with the
+same recipe over several seeds, adds a perfect-future-weather upper bound, and writes the report. It needs a finished
+batch for that site (section 3.7), because it reuses the batch's predictions and test windows.
+
+```powershell
+.\.venv\Scripts\python.exe tools/fusion_study.py --site ssp --seeds 0,1,2,3,4 --time-limit 20
+.\.venv\Scripts\python.exe tools/fusion_study.py --site ssp --report-only     # rebuild the report
+```
+
+With 5 seeds it takes about an hour on an RTX 3060. Outputs:
+
+```text
+results/fusion_ssp.json
+Resources/Fusion_Report_SSP_<date>.md
+Resources/Fusion_Report_SSP_<date>.pdf
+Resources/Fusion_Report_SSP_<date>_figures/
+```
+
+Read fusion gains against the seed spread in the report: a difference smaller than one standard deviation is noise.
+
+### 3.9 Add a weather forecast (NWP) and train the best model
+
+The best model so far is the conv fusion with NWP inputs (reports `results/nwp_s3.md` and `results/bestModel_s4.md`). It needs these files:
+
+| Part | Files |
+|---|---|
+| data | `Data/features_ssp_2025/dataset.parquet`; `Data/nwp/ssp_ecmwf_ifs025_2025.parquet` (downloaded automatically if missing and online) |
+| NWP features | `pvf/data/nwp.py`, `pvf/data/features.py` |
+| model | `pvf/models/architectures/fusion_models.py` (with `transformers.py`, `probabilistic.py`, `state_space.py` and `pvf/models/blocks/`) |
+| recipe | `FUSION_STUDY_RECIPE` in `pvf/training/paper_recipes.py` |
+| studies | `tools/run_all_models.py`, `tools/fusion_study.py`, `tools/nwp_study.py`, `tools/report_names.py` |
+
+To train only the best model, change three lines in the notebook's **CHOOSE** cells and keep `use_paper_recipe = True`:
+
+```python
+# CHOOSE the model
+model_name = "patch_tst_conv_gate"
+model_hyperparameters.update({"gate_reads_future": True})
+
+# CHOOSE the data: add the three NWP features to the future inputs
+future_feature_names=["clear_sky_irradiance", "ac_power_yesterday",
+                      "hour_of_day_sin", "hour_of_day_cos", "day_of_year_sin", "day_of_year_cos",
+                      "nwp_irradiance", "nwp_cloud_cover", "nwp_temperature"],
+```
+
+The preset then supplies the fusion study's recipe (`FUSION_STUDY_RECIPE`: Adam 1e-4, plateau scheduler, up to 30 epochs, early stopping on validation nRMSE) and the 96-step lookback. One run takes about 1.5 minutes on an RTX 3060.
+
+To repeat the full comparison of reports s3 and s4, run the three studies in order; each reuses the previous one's runs and test windows:
+
+```powershell
+.\.venv\Scripts\python.exe tools/run_all_models.py --site ssp --time-limit 15     # batch (common test windows)
+.\.venv\Scripts\python.exe tools/fusion_study.py --site ssp --seeds 0,1,2,3,4 --time-limit 20
+.\.venv\Scripts\python.exe tools/nwp_study.py --site ssp --seeds 0,1,2,3,4 --time-limit 20
+```
+
+The batch takes about two hours, each study about an hour. Copying the `runs/` and `results/` folders from a machine that has already run them replaces the first two steps.
+
+### 3.10 Use a consistent research protocol
 
 1. Record the site, data version, resolution, history/future features, horizon, split, and any oracle inputs.
 2. Select hyperparameters using validation data. Keep test/holdout data out of that selection process.
@@ -549,9 +667,10 @@ The manifest is saved as models complete, but a new batch invocation starts a ne
 
 | Problem | What to check |
 |---|---|
-| `git`, `py`, or `code` is not recognized | Reopen the terminal after installation; verify PATH. Open the folder through VS Code's menu if only `code` is missing |
-| `ModuleNotFoundError: pvf` | Select the project `.venv`; rerun `.\.venv\Scripts\python.exe -m pip install --no-deps -e .` from the root |
-| A dependency fails to install | Read the first pip error, verify Python 3.11 and network access, and rerun the failed requirements step. Avoid silently substituting versions if reproducibility matters |
+| `git` or `code` is not recognized | Reopen the terminal after installation; verify PATH. Open the folder through VS Code's menu if only `code` is missing |
+| `setup.bat` cannot download uv or Python | Check internet access and any proxy or firewall; GitHub downloads must be allowed. Run `setup.bat` again after fixing it |
+| `ModuleNotFoundError: pvf` | Select the project `.venv`; rerun `setup.bat` |
+| A dependency fails to install | Read the first error, check network access, and run `setup.bat` again. If it persists, delete `.venv` and `.tools` and rerun. Avoid silently substituting versions if reproducibility matters |
 | `.venv` came from another machine | Recreate the environment locally using the setup script; copying a virtual environment is unreliable |
 | `nvidia-smi` fails | Verify the NVIDIA driver installation, restart if required, or explicitly use CPU |
 | `nvidia-smi` works but PyTorch reports no GPU | Check the notebook interpreter and PyTorch build; a CPU wheel does not enable CUDA. After correcting the build, restart the kernel |
@@ -566,15 +685,11 @@ The manifest is saved as models complete, but a new batch invocation starts a ne
 | No holdout metrics | Set nonempty holdout months, include `"holdout"` in evaluation splits, and confirm that the dataset has valid windows there |
 | Foundation-model download fails | Check access to its Hugging Face repository or copy a complete local weight folder from a working machine |
 | Report-only command fails | Check that `results/batch_<site>.json` exists and its referenced run folders are still accessible |
+| Fusion study stops at the start | It needs `results/batch_<site>.json` from a finished batch for the same site, with every run folder present |
 
 ## 5. Linux setup equivalent
 
-With Python 3.11 and VS Code already installed, install Git using the distribution's package manager. For Ubuntu/Debian:
-
-```bash
-sudo apt update
-sudo apt install git python3.11-venv
-```
+No Python installation is needed: `setup_venv.sh` downloads uv and a private Python 3.11 into `.tools/`, as on Windows. Install Git and curl if missing (Ubuntu/Debian: `sudo apt install git curl`).
 
 Install an NVIDIA driver suitable for the distribution and GPU if using CUDA, and check `nvidia-smi`. Obtain the repository and processed `Data/` folder as above, then run from the project root:
 
@@ -593,6 +708,6 @@ The Linux script uses `requirements/lock-linux.txt`; its automatic cu126 selecti
 For Linux JupyterLab or a batch:
 
 ```bash
-.venv/bin/jupyter lab
+.venv/bin/jupyter lab notebooks/run_experiment.ipynb
 .venv/bin/python tools/run_all_models.py --site ssp --models lstm,patch_tst --time-limit 15
 ```

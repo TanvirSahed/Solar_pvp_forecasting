@@ -24,6 +24,12 @@ R6_RECIPE = TrainingRecipe(optimizer="adam", learning_rate=1e-4, weight_decay=0.
                            optimizer_options={"betas": (0.9, 0.999)}, scheduler="reduce_on_plateau",
                            scheduler_options={"factor": 0.5, "patience": 2}, n_epochs=100,
                            early_stopping_metric="validation_loss", early_stopping_patience=4)
+# Fusion study (tools/fusion_study.py): one recipe for the PatchTST control and every fusion, so the architecture
+# is the only difference between them. Built on R7's PatchTST settings (Adam 1e-4, batch 48).
+FUSION_STUDY_RECIPE = TrainingRecipe(optimizer="adam", learning_rate=1e-4, weight_decay=0.0,
+                                     scheduler="reduce_on_plateau", scheduler_options={"factor": 0.5, "patience": 2},
+                                     n_epochs=30, early_stopping_metric="nrmse", early_stopping_patience=5,
+                                     batch_size=48)
 CONSENSUS_RECIPE = TrainingRecipe(optimizer="adamw", learning_rate=1e-3, weight_decay=1e-4,
                                   scheduler="reduce_on_plateau", scheduler_options={"factor": 0.5, "patience": 4},
                                   n_epochs=100, early_stopping_metric="nrmse", early_stopping_patience=10)
@@ -82,6 +88,10 @@ PAPER_RECIPES = {r.model_name: r for r in [
                 ["no paper; temporal Mamba part follows R6"]),
     PaperRecipe("fusion_itransformer_hdcf", "R6 recipe", {"fusion_size": 128, "state_size": 32}, R6_RECIPE, 96,
                 ["worked example; follows its Mamba branch's paper (R6)"]),
+    *[PaperRecipe(name, "fusion study (shared recipe, not a paper)", {}, FUSION_STUDY_RECIPE, 48,
+                  ["evidence-driven fusion of PatchTST with a partner; see Resources/Fusion_Report_* and "
+                   "pvf/models/architectures/fusion_models.py"])
+      for name in ("patch_tst_conv_gate", "patch_tst_mamba_gate", "patch_tst_variable_gate")],
     PaperRecipe("rfkan", "R16", {"n_harmonics": 8, "n_layers": 2, "recurrent_window_steps": 12},
                 _recipe(CONSENSUS_RECIPE, optimizer="adam", learning_rate=1e-3, scheduler="none", batch_size=32,
                         n_epochs=50), 24,

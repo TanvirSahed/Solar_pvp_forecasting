@@ -9,24 +9,20 @@ For setup from scratch, a file-by-file project map, and step-by-step experiment 
 
 ## Quick start
 
-Use Python 3.11 and VS Code with Microsoft's Python and Jupyter extensions. Install [Git](https://git-scm.com/install/windows), then clone:
+Nothing has to be installed first, not even Python.
 
-```powershell
-git clone https://github.com/TanvirSahed/Solar_pvp_forecasting.git
-cd Solar_pvp_forecasting
-```
+1. Get the project: on GitHub choose **Code > Download ZIP** and extract it, or clone it with Git:
+   `git clone https://github.com/TanvirSahed/Solar_pvp_forecasting.git`
+2. Copy the processed `Data/` folder from the project owner into the project folder. Datasets are shared separately;
+   GitHub does not include them. The [guide lists the required Parquet files](docs/experiment_guide.md#16-obtain-the-datasets-separately).
+3. Double-click **`setup.bat`**. It downloads [uv](https://docs.astral.sh/uv/), a private Python 3.11 and the pinned
+   packages into the project folder (about 3 GB the first time), picks a GPU or CPU build of PyTorch automatically,
+   and ends with an environment check. Any Python already on the machine is ignored.
+4. Double-click **`start_notebook.bat`** and follow the **CHOOSE** cells of `notebooks/run_experiment.ipynb` from top
+   to bottom. VS Code works too: open the folder and pick the `.venv` kernel.
 
-Obtain the processed `Data/` folder from the project owner and copy it into this folder before setup.
-Datasets are shared separately; GitHub does not include them. The [guide lists the four required Parquet files](docs/experiment_guide.md#16-obtain-the-datasets-separately).
-Pretrained model weights download automatically when first needed.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup_venv.ps1
-```
-
-On Linux, run `bash setup_venv.sh` instead. Setup selects a GPU or CPU build automatically.
-Open this folder in VS Code, open `notebooks/run_experiment.ipynb`, select the `.venv` kernel,
-then follow the **CHOOSE** cells from top to bottom. No Docker installation is needed.
+On Linux, run `bash setup_venv.sh`, then `.venv/bin/jupyter lab notebooks/run_experiment.ipynb`.
+Pretrained foundation-model weights and the NWP weather archive download automatically when first needed.
 
 ## How the pieces connect
 

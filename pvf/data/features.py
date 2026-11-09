@@ -18,6 +18,8 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
+from .nwp import nwp_column
+
 CALENDAR_FEATURE_NAMES = ["hour_of_day_sin", "hour_of_day_cos", "day_of_year_sin", "day_of_year_cos"]
 
 
@@ -63,7 +65,21 @@ FEATURES: dict[str, Feature] = {f.name: f for f in [
     Feature("hour_of_day_cos", "cos(2 pi hour/24)", True, lambda r, _: np.cos(2 * np.pi * _hour_fraction(r))),
     Feature("day_of_year_sin", "sin(2 pi day/365)", True, lambda r, _: np.sin(2 * np.pi * _day_fraction(r))),
     Feature("day_of_year_cos", "cos(2 pi day/365)", True, lambda r, _: np.cos(2 * np.pi * _day_fraction(r))),
-    # Perfect-forecast stand-ins for NWP (no NWP archive yet). Upper bound only - never report as a real forecast.
+    # Archived NWP forecasts (pvf/data/nwp.py, ECMWF IFS by default). "day1" = issued ~24 h before the target time,
+    # "_day2" = ~48 h before (strictly earlier than every origin of a 24 h horizon).
+    Feature("nwp_irradiance", "NWP global irradiance forecast (issued ~24 h ahead) / 1000 W/m2", True,
+            lambda r, _: nwp_column(r, "shortwave_radiation", 1) / 1000.0),
+    Feature("nwp_cloud_cover", "NWP total cloud cover forecast (issued ~24 h ahead) / 100 %", True,
+            lambda r, _: nwp_column(r, "cloud_cover", 1) / 100.0),
+    Feature("nwp_temperature", "(NWP 2 m air temperature forecast (issued ~24 h ahead) - 25 C) / 25 C", True,
+            lambda r, _: (nwp_column(r, "temperature_2m", 1) - 25.0) / 25.0),
+    Feature("nwp_irradiance_day2", "NWP global irradiance forecast issued ~48 h ahead / 1000 W/m2", True,
+            lambda r, _: nwp_column(r, "shortwave_radiation", 2) / 1000.0),
+    Feature("nwp_cloud_cover_day2", "NWP total cloud cover forecast issued ~48 h ahead / 100 %", True,
+            lambda r, _: nwp_column(r, "cloud_cover", 2) / 100.0),
+    Feature("nwp_temperature_day2", "(NWP 2 m air temperature forecast issued ~48 h ahead - 25 C) / 25 C", True,
+            lambda r, _: (nwp_column(r, "temperature_2m", 2) - 25.0) / 25.0),
+    # Perfect-forecast stand-ins for NWP. Upper bound only - never report as a real forecast.
     Feature("irradiance_oracle", "measured irradiance used as a perfect forecast", True,
             lambda r, _: r["irradiance_wm2"].to_numpy() / 1000.0),
     Feature("module_temperature_oracle", "measured module temperature used as a perfect forecast", True,

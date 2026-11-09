@@ -1,6 +1,7 @@
-# Python environments, caches, and build output
+# Python environments, caches, and build output (.tools/ holds uv and its private Python, made by setup)
 .venv/
 venv/
+/.tools/
 __pycache__/
 *.py[cod]
 *.egg-info/

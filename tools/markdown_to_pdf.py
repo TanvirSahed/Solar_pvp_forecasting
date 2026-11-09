@@ -3,6 +3,7 @@
     python tools/markdown_to_pdf.py docs/training_recipes.md Resources/Training_Recipes_Reference_Papers.pdf
 
 Supports the subset the reports use: # / ## / ### headings, paragraphs, nested "-" bullets, "1." lists, pipe tables,
+``` fenced code blocks (diagrams, formulas),
 ![caption](image.png) on its own line (path relative to the Markdown file),
 **bold**, `code`, [text](url). Uses Windows Arial (falls back to Helvetica) so symbols such as -> <= alpha render.
 """
@@ -19,8 +20,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (Image, ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer,
-                                Table, TableStyle)
+from reportlab.platypus import (Image, ListFlowable, ListItem, Paragraph, Preformatted, SimpleDocTemplate,
+                                Spacer, Table, TableStyle)
 
 FONT_DIR = Path("C:/Windows/Fonts")
 
@@ -47,9 +48,12 @@ def inline_markup(text: str, code_font: str) -> str:
     return text
 
 
-def build_styles(body_font, bold_font):
+def build_styles(body_font, bold_font, code_font="Courier"):
     base = getSampleStyleSheet()
     return {
+        "code": ParagraphStyle("code", parent=base["Code"], fontName=code_font, fontSize=7.8, leading=9.6,
+                               backColor=colors.HexColor("#f4f3ef"), borderPadding=4, leftIndent=4, spaceBefore=2,
+                               spaceAfter=6),
         "title": ParagraphStyle("title", parent=base["Title"], fontName=bold_font, fontSize=18, leading=22,
                                 alignment=TA_LEFT, spaceAfter=4),
         "h2": ParagraphStyle("h2", parent=base["Heading2"], fontName=bold_font, fontSize=13, leading=16,
@@ -119,6 +123,13 @@ def markdown_to_story(markdown: str, styles, code_font, available_width, base_di
         line = lines[i]
         if not line.strip():
             i += 1
+        elif line.lstrip().startswith("```"):
+            block, i = [], i + 1
+            while i < len(lines) and not lines[i].lstrip().startswith("```"):
+                block.append(lines[i].replace("‑", "-"))
+                i += 1
+            story.append(Preformatted("\n".join(block), styles["code"]))
+            i += 1                                                        # skip the closing fence
         elif line.startswith("# "):
             story.append(Paragraph(inline_markup(line[2:], code_font), styles["title"]))
             i += 1
@@ -146,8 +157,8 @@ def markdown_to_story(markdown: str, styles, code_font, available_width, base_di
                 i += 1
             story += [parse_list(block, styles, code_font), Spacer(1, 3)]
         else:
-            block = []
-            while i < len(lines) and lines[i].strip() and not re.match(r"(#|!\[|\s*\||\s*(-|\d+\.)\s)", lines[i]):
+            block, block_start = [], r"(#|!\[|\s*\||\s*(-|\d+\.)\s|\s*```)"
+            while i < len(lines) and lines[i].strip() and not re.match(block_start, lines[i]):
                 block.append(lines[i].strip())
                 i += 1
             story.append(Paragraph(inline_markup(" ".join(block), code_font), styles["body"]))
@@ -156,7 +167,7 @@ def markdown_to_story(markdown: str, styles, code_font, available_width, base_di
 
 def convert(markdown_path: Path, pdf_path: Path):
     body_font, bold_font, code_font = register_fonts()
-    styles = build_styles(body_font, bold_font)
+    styles = build_styles(body_font, bold_font, code_font)
     page_size = landscape(A4)
     margin = 1.4 * cm
     document = SimpleDocTemplate(str(pdf_path), pagesize=page_size, leftMargin=margin, rightMargin=margin,
